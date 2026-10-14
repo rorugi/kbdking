@@ -177,6 +177,7 @@ public partial class WindowsInstallTests
             Assert.False(TaskExists(installed.Klid));
 
             // Expired test installs are removed by the cleanup run.
+            system.Uninstall(installed.Klid);
             installed = system.InstallTemporary(package, TimeSpan.FromMinutes(30), Environment.ProcessPath!);
             using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Control\Keyboard Layouts\{installed.Klid}", writable: true)!)
                 key.SetValue(WindowsLayoutSystem.TemporaryValue, DateTimeOffset.UtcNow.AddMinutes(-1).ToString("O", System.Globalization.CultureInfo.InvariantCulture));
