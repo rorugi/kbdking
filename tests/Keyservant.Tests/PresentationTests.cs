@@ -5,7 +5,7 @@ using Keyservant.Presentation;
 
 namespace Keyservant.Tests;
 
-public class PresentationTests
+public partial class PresentationTests
 {
     private sealed class FakeDialogs : IDialogService
     {
@@ -26,6 +26,8 @@ public class PresentationTests
         public Task<OperationResult> InstallAsync(string layoutFile) { Calls.Add("install " + layoutFile); return Task.FromResult(new OperationResult(true, "ok")); }
         public Task<OperationResult> UninstallAsync(string klid) { Calls.Add("uninstall " + klid); return Task.FromResult(new OperationResult(true, "ok")); }
         public Task<OperationResult> RepairAsync() { Calls.Add("repair"); return Task.FromResult(new OperationResult(true, "ok")); }
+        public Task<OperationResult> InstallTemporaryAsync(string layoutFile, int minutes) { Calls.Add($"temporary {minutes} {layoutFile}"); return Task.FromResult(new OperationResult(true, "ok")); }
+        public Task<OperationResult> KeepAsync(string klid) { Calls.Add("keep " + klid); return Task.FromResult(new OperationResult(true, "ok")); }
     }
 
     private sealed class FakeSystem : ILayoutSystem
@@ -44,6 +46,9 @@ public class PresentationTests
         public void Uninstall(string klid) => throw new NotSupportedException();
         public IReadOnlyList<string> DescribeUninstall(string klid) => ["files"];
         public RepairReport Repair() => throw new NotSupportedException();
+        public InstalledLayout InstallTemporary(LayoutPackage package, TimeSpan duration, string cleanupExecutable) => throw new NotSupportedException();
+        public void Keep(string klid) => Calls.Add("keep " + klid);
+        public IReadOnlyList<string> CleanupExpired() => [];
     }
 
     [Fact]

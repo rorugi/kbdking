@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Keyservant.Tests" />
+    <EmbeddedResource Include="Unicode\UnicodeNames.txt.gz" LogicalName="Keyservant.Core.Unicode.UnicodeNames.txt.gz" />
   </ItemGroup>
 
 </Project>

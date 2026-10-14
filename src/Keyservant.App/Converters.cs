@@ -13,8 +13,9 @@ public static class Converters
 
     public static Visibility VisibleIfText(string? value) => string.IsNullOrEmpty(value) ? Visibility.Collapsed : Visibility.Visible;
 
-    public static Brush KeyBackground(bool isSelected, bool isDead, bool isCharacterKey) =>
+    public static Brush KeyBackground(bool isSelected, bool isDead, bool isCharacterKey, bool isHighlighted) =>
         Resource(isSelected ? "SystemFillColorAttentionBackgroundBrush"
+            : isHighlighted ? "SystemFillColorSuccessBackgroundBrush"
             : isDead ? "SystemFillColorCautionBackgroundBrush"
             : isCharacterKey ? "ControlFillColorDefaultBrush"
             : "ControlFillColorTertiaryBrush");
@@ -31,6 +32,13 @@ public static class Converters
         Severity.Error => "SystemFillColorCriticalBrush",
         Severity.Warning => "SystemFillColorCautionBrush",
         _ => "SystemFillColorAttentionBrush",
+    });
+
+    public static Brush TestBrush(bool? passed) => Resource(passed switch
+    {
+        true => "SystemFillColorSuccessBrush",
+        false => "SystemFillColorCriticalBrush",
+        null => "TextFillColorSecondaryBrush",
     });
 
     private static Brush Resource(string key) => (Brush)Application.Current.Resources[key];

@@ -17,6 +17,11 @@ internal sealed class CliPrivilegedOperations : IPrivilegedOperations
 
     public Task<OperationResult> RepairAsync() => RunAsync("repair");
 
+    public Task<OperationResult> InstallTemporaryAsync(string layoutFile, int minutes) =>
+        RunAsync("install", layoutFile, "--temporary", minutes.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    public Task<OperationResult> KeepAsync(string klid) => RunAsync("keep", klid);
+
     private static Task<OperationResult> RunAsync(params string[] args) => Task.Run(() =>
     {
         if (!File.Exists(CliPath))

@@ -1,4 +1,8 @@
+using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Security;
+using System.Text;
 using System.Runtime.Versioning;
 using Keyservant.Binary.Packaging;
 using Keyservant.Platform.Native;
@@ -21,6 +25,8 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
     private const string LayoutsKey = @"SYSTEM\CurrentControlSet\Control\Keyboard Layouts";
     private const string MarkerValue = "Keyservant";
     private const string PackageFileName = "package.kslayout";
+    internal const string TemporaryValue = "KeyservantTemporaryUntil";
+    internal const string TaskFolder = "Keyservant";
 
     private readonly string _system32;
     private readonly string _sysWow64;
@@ -51,6 +57,8 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
             if (key is null) continue;
             var file = key.GetValue("Layout File") as string ?? "";
             var isCustom = key.GetValue(MarkerValue) is not null;
+            DateTimeOffset? temporaryUntil = key.GetValue(TemporaryValue) is string t
+                && DateTimeOffset.TryParse(t, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var until) ? until : null;
             string? problem = null;
             if (string.IsNullOrEmpty(file)) problem = "No layout DLL is registered.";
             else if (!File.Exists(Path.Combine(_system32, file))) problem = $"{file} is missing from System32.";
@@ -65,6 +73,7 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
                 IsCustom = isCustom,
                 IsEnabled = enabled.Contains(klid),
                 Problem = problem,
+                TemporaryUntil = temporaryUntil,
             });
         }
         return [.. result.OrderBy(l => l.Name, StringComparer.CurrentCultureIgnoreCase)];
@@ -117,7 +126,9 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
         if (owner is null && File.Exists(Path.Combine(_system32, package.DllFileName)))
             throw new LayoutSystemException($"{package.DllFileName} already exists in System32 and isn't a Keyservant layout. Choose a different DLL name.");
 
-        CopyDll(package.DllX64, Path.Combine(_system32, package.DllFileName));
+        // System32 gets the DLL of the machine's own architecture; SysWOW64 the 32-bit one.
+        var native = RuntimeInformation.OSArchitecture == Architecture.Arm64 && package.DllArm64 is not null ? package.DllArm64 : package.DllX64;
+        CopyDll(native, Path.Combine(_system32, package.DllFileName));
         if (package.DllWow64 is not null && Directory.Exists(_sysWow64))
             CopyDll(package.DllWow64, Path.Combine(_sysWow64, package.DllFileName));
 
@@ -129,6 +140,7 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
             if (key.GetValue("Layout Id") is not string)
                 key.SetValue("Layout Id", AllocateLayoutId(root));
             key.SetValue(MarkerValue, package.Version);
+            key.DeleteValue(TemporaryValue, throwOnMissingValue: false);
         }
 
         SavePackage(klid, package);
@@ -206,7 +218,7 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
                     {
                         Name = package.Name, DllFileName = package.DllFileName, Locale = package.Locale,
                         LanguageId = package.LanguageId, Version = package.Version, LayoutId = klid,
-                        DllX64 = package.DllX64, DllWow64 = package.DllWow64, LayoutSource = package.LayoutSource,
+                        DllX64 = package.DllX64, DllWow64 = package.DllWow64, DllArm64 = package.DllArm64, LayoutSource = package.LayoutSource,
                     });
                     report.Fixed.Add($"Restored {package.Name} ({klid}).");
                 }
@@ -225,6 +237,102 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
             report.Fixed.Add($"Removed orphaned registration {klid} (its DLL and package were gone).");
         }
         return report;
+    }
+
+    // ---------------------------------------------------------------- temporary installs
+
+    public InstalledLayout InstallTemporary(LayoutPackage package, TimeSpan duration, string cleanupExecutable)
+    {
+        var installed = Install(package);
+        var until = DateTimeOffset.UtcNow + duration;
+        using (var key = Registry.LocalMachine.OpenSubKey($@"{LayoutsKey}\{installed.Klid}", writable: true))
+        {
+            key?.SetValue(TemporaryValue, until.ToString("O", CultureInfo.InvariantCulture));
+        }
+        ScheduleCleanup(installed.Klid, until, cleanupExecutable);
+        return installed with { TemporaryUntil = until };
+    }
+
+    public void Keep(string klid)
+    {
+        Elevation.RequireAdministrator("Keeping a layout");
+        var layout = FindCustom(klid);
+        using (var key = Registry.LocalMachine.OpenSubKey($@"{LayoutsKey}\{layout.Klid}", writable: true))
+        {
+            key?.DeleteValue(TemporaryValue, throwOnMissingValue: false);
+        }
+        DeleteCleanupTask(layout.Klid);
+    }
+
+    public IReadOnlyList<string> CleanupExpired()
+    {
+        Elevation.RequireAdministrator("Removing expired test installs");
+        var removed = new List<string>();
+        foreach (var layout in GetLayouts().Where(l => l.IsCustom && l.TemporaryUntil is { } u && u <= DateTimeOffset.UtcNow))
+        {
+            Uninstall(layout.Klid);
+            DeleteCleanupTask(layout.Klid);
+            removed.Add($"{layout.Name} ({layout.Klid})");
+        }
+        return removed;
+    }
+
+    /// <summary>
+    /// Registers a one-time scheduled task (as SYSTEM) that runs "keyservant cleanup" when the test install
+    /// expires, so the layout is reverted even if the app is closed or the PC restarted in between.
+    /// The task is defined in XML, which avoids locale-dependent date formats on the command line.
+    /// </summary>
+    private static void ScheduleCleanup(string klid, DateTimeOffset at, string executable)
+    {
+        var start = at.ToLocalTime().ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
+        var xml = $$"""
+            <?xml version="1.0" encoding="UTF-16"?>
+            <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+              <RegistrationInfo><Description>Reverts the Keyservant test install of keyboard layout {{klid}}.</Description></RegistrationInfo>
+              <Triggers><TimeTrigger><StartBoundary>{{start}}</StartBoundary><Enabled>true</Enabled></TimeTrigger></Triggers>
+              <Principals><Principal id="System"><UserId>S-1-5-18</UserId><RunLevel>HighestAvailable</RunLevel></Principal></Principals>
+              <Settings>
+                <StartWhenAvailable>true</StartWhenAvailable>
+                <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+                <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+                <ExecutionTimeLimit>PT10M</ExecutionTimeLimit>
+              </Settings>
+              <Actions Context="System"><Exec><Command>{{SecurityElement.Escape(executable)}}</Command><Arguments>cleanup</Arguments></Exec></Actions>
+            </Task>
+            """;
+        var file = Path.Combine(Path.GetTempPath(), $"keyservant-task-{klid}.xml");
+        File.WriteAllText(file, xml, Encoding.Unicode);
+        try
+        {
+            RunSchtasks(["/Create", "/TN", $@"{TaskFolder}\Revert {klid}", "/XML", file, "/F"]);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    private static void DeleteCleanupTask(string klid)
+    {
+        try { RunSchtasks(["/Delete", "/TN", $@"{TaskFolder}\Revert {klid}", "/F"]); }
+        catch (LayoutSystemException) { /* the task may not exist */ }
+    }
+
+    private static void RunSchtasks(IEnumerable<string> args)
+    {
+        var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "schtasks.exe"))
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        using var p = Process.Start(psi) ?? throw new LayoutSystemException("Could not start schtasks.exe.");
+        var error = p.StandardError.ReadToEnd();
+        p.StandardOutput.ReadToEnd();
+        p.WaitForExit();
+        if (p.ExitCode != 0) throw new LayoutSystemException($"schtasks failed: {error.Trim()}");
     }
 
     // ---------------------------------------------------------------- helpers

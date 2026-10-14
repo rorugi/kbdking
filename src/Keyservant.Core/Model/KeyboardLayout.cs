@@ -103,6 +103,12 @@ public sealed class KeyboardLayout
     /// <summary>Names of E0-prefixed scan codes.</summary>
     public SortedDictionary<byte, string> KeyNamesExt { get; } = new();
 
+    /// <summary>Optional compose key and sequences, compiled into chained dead keys when the layout is built.</summary>
+    public Keyservant.Core.Compose.ComposeDefinition? Compose { get; set; }
+
+    /// <summary>Assertions about what key sequences type, checked by the validator.</summary>
+    public List<LayoutTestCase> Tests { get; } = [];
+
     public KeyDefinition? FindKey(byte vk) => Keys.Find(k => k.VirtualKey == vk);
 
     public KeyDefinition GetOrAddKey(byte vk)
@@ -172,6 +178,19 @@ public sealed class KeyboardLayout
         }
     }
 
+    /// <summary>Removes a shift state's column and every character stored under it.</summary>
+    public void RemoveShiftState(ShiftState state)
+    {
+        if (Modifiers.ColumnOf(state) is not { } column) return;
+        var canonical = Modifiers.CanonicalState(column);
+        foreach (var key in Keys)
+        {
+            key.Outputs.Remove(canonical);
+            key.CapsOutputs?.Remove(canonical);
+        }
+        Modifiers.RemoveColumn(column);
+    }
+
     public KeyboardLayout Clone()
     {
         var l = new KeyboardLayout
@@ -188,6 +207,8 @@ public sealed class KeyboardLayout
         l.DeadKeys.AddRange(DeadKeys.Select(d => d.Clone()));
         foreach (var (k, v) in KeyNames) l.KeyNames[k] = v;
         foreach (var (k, v) in KeyNamesExt) l.KeyNamesExt[k] = v;
+        l.Compose = Compose?.Clone();
+        l.Tests.AddRange(Tests);
         return l;
     }
 }

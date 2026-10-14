@@ -5,7 +5,7 @@ using Keyservant.Core.Model;
 namespace Keyservant.Presentation;
 
 /// <summary>The output of the selected key in one shift state, edited as text plus a dead-key switch.</summary>
-public sealed class OutputRowViewModel : ObservableObject
+public sealed class OutputRowViewModel : ObservableObject, ICharacterTarget
 {
     private readonly EditorViewModel _editor;
     private readonly byte _vk;
@@ -50,9 +50,19 @@ public sealed class OutputRowViewModel : ObservableObject
     public string? Error { get => _error; private set => SetProperty(ref _error, value); }
 
     /// <summary>Code points of the current text, e.g. "U+0101 LATIN SMALL LETTER A WITH MACRON" (name if known).</summary>
-    public string CodePoints => TryParse(_text, out var s) && s.Length > 0
-        ? string.Join(" ", EnumerateRunes(s).Select(r => $"U+{r.Value:X4}"))
-        : "";
+    public string CodePoints => Describe(_text);
+
+    public void PickCharacter(string text) => Text = text;
+
+    /// <summary>"U+0101 LATIN SMALL LETTER A WITH MACRON" for one character, codes only for longer text.</summary>
+    internal static string Describe(string text)
+    {
+        if (!TryParse(text, out var s) || s.Length == 0) return "";
+        var runes = EnumerateRunes(s).ToList();
+        if (runes.Count == 1)
+            return $"U+{runes[0].Value:X4} {Keyservant.Core.Unicode.UnicodeCatalog.GetName(runes[0].Value)}".TrimEnd();
+        return string.Join(" ", runes.Select(r => $"U+{r.Value:X4}"));
+    }
 
     private void Apply()
     {
@@ -133,6 +143,8 @@ public sealed class KeyEditorViewModel : ObservableObject
         _editor = editor;
         _key = key;
         Title = $"{VirtualKeys.GetName(key.VirtualKey)}";
+        var scan = layout.ScanCodes.FindScanCode(key.VirtualKey);
+        Details = scan is { } sc ? $"Scan code {sc:X2} → virtual key {VirtualKeys.GetName(key.VirtualKey)}" : $"Virtual key {VirtualKeys.GetName(key.VirtualKey)} (no scan code produces it)";
         foreach (var s in states)
         {
             var canonical = layout.Modifiers.Canonicalize(s) ?? s;
@@ -141,6 +153,8 @@ public sealed class KeyEditorViewModel : ObservableObject
     }
 
     public string Title { get; }
+
+    public string Details { get; }
 
     public List<OutputRowViewModel> Rows { get; } = [];
 
@@ -153,6 +167,7 @@ public sealed class KeyEditorViewModel : ObservableObject
             if (value == CapsLock) return;
             _key.Attributes = value ? _key.Attributes | KeyAttributes.CapsLock : _key.Attributes & ~KeyAttributes.CapsLock;
             _editor.MarkChanged();
+            _editor.RefreshKeyboard();
             OnPropertyChanged();
         }
     }
@@ -166,6 +181,7 @@ public sealed class KeyEditorViewModel : ObservableObject
             if (value == CapsLockAltGr) return;
             _key.Attributes = value ? _key.Attributes | KeyAttributes.CapsLockAltGr : _key.Attributes & ~KeyAttributes.CapsLockAltGr;
             _editor.MarkChanged();
+            _editor.RefreshKeyboard();
             OnPropertyChanged();
         }
     }

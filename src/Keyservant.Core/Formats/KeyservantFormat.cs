@@ -53,6 +53,8 @@ public sealed class KeyservantFormat : ILayoutFormat
             ["keyNames"] = WriteNames(layout.KeyNames),
             ["keyNamesExt"] = WriteNames(layout.KeyNamesExt),
         };
+        if (layout.Compose is { } compose) root["compose"] = WriteCompose(compose);
+        if (layout.Tests.Count > 0) root["tests"] = WriteTests(layout.Tests);
         return CompactJsonWriter.Write(root);
     }
 
@@ -179,6 +181,32 @@ public sealed class KeyservantFormat : ILayoutFormat
         return arr;
     }
 
+    private static JsonObject WriteCompose(Keyservant.Core.Compose.ComposeDefinition c)
+    {
+        var sequences = new JsonArray();
+        foreach (var seq in c.Sequences) sequences.Append(new JsonArray(seq.Keys, seq.Result));
+        return new JsonObject
+        {
+            ["key"] = c.KeyText,
+            ["accent"] = c.Accent.ToString(),
+            ["sequences"] = sequences,
+        };
+    }
+
+    private static JsonArray WriteTests(List<LayoutTestCase> tests)
+    {
+        var arr = new JsonArray();
+        foreach (var t in tests)
+        {
+            var o = new JsonObject();
+            if (!string.IsNullOrEmpty(t.Name)) o["name"] = t.Name;
+            o["keys"] = t.Keys;
+            o["expect"] = t.Expect;
+            arr.Append(o);
+        }
+        return arr;
+    }
+
     private static JsonObject WriteNames(SortedDictionary<byte, string> names)
     {
         var o = new JsonObject();
@@ -236,10 +264,23 @@ public sealed class KeyservantFormat : ILayoutFormat
         ReadNames(root["keyNames"] as JsonObject, layout.KeyNames, "keyNames");
         ReadNames(root["keyNamesExt"] as JsonObject, layout.KeyNamesExt, "keyNamesExt");
 
+        if (root["compose"] is JsonObject compose) layout.Compose = ReadCompose(compose);
+        if (root["tests"] is JsonArray tests)
+        {
+            var i = 0;
+            foreach (var node in tests)
+            {
+                if (node is not JsonObject t || Str(t, "keys") is not { } testKeys || Str(t, "expect") is not { } expect)
+                    throw Error($"tests[{i}] needs \"keys\" and \"expect\".");
+                layout.Tests.Add(new LayoutTestCase(testKeys, expect, Str(t, "name")));
+                i++;
+            }
+        }
+
         layout.NormalizeShiftStates();
 
         string[] known = ["format", "schemaVersion", "metadata", "flags", "kbdVersion", "keyboardType", "keyboardSubType",
-            "modifiers", "scanCodes", "keys", "deadKeys", "keyNames", "keyNamesExt"];
+            "modifiers", "scanCodes", "keys", "deadKeys", "keyNames", "keyNamesExt", "compose", "tests"];
         foreach (var (name, _) in root)
         {
             if (!known.Contains(name)) report.Warn($"Ignored unknown property \"{name}\".");
@@ -423,6 +464,26 @@ public sealed class KeyservantFormat : ILayoutFormat
             }
         }
         return d;
+    }
+
+    private static Keyservant.Core.Compose.ComposeDefinition ReadCompose(JsonObject o)
+    {
+        var c = new Keyservant.Core.Compose.ComposeDefinition();
+        if (Str(o, "key") is { } key)
+        {
+            try { (c.ScanCode, c.Extended) = Keyservant.Core.Compose.ComposeDefinition.ParseKey(key); }
+            catch (FormatException ex) { throw Error("compose.key: " + ex.Message); }
+        }
+        if (Str(o, "accent") is { Length: 1 } accent) c.Accent = accent[0];
+        if (o["sequences"] is JsonArray seqs)
+        {
+            foreach (var node in seqs)
+            {
+                if (node is not JsonArray pair || pair.Count != 2) throw Error("Each compose sequence must be [\"keys\", \"result\"].");
+                c.Sequences.Add(new Keyservant.Core.Compose.ComposeSequence(pair[0]!.GetValue<string>(), pair[1]!.GetValue<string>()));
+            }
+        }
+        return c;
     }
 
     private static void ReadNames(JsonObject? o, SortedDictionary<byte, string> target, string what)

@@ -144,6 +144,22 @@ public static partial class LayoutValidator
 
         if (layout.KeyNames.Count == 0)
             Add(Severity.Warning, "KS050", "The layout has no key names; Windows will show empty names for keys like Shift or Enter.");
+
+        // Compose sequences
+        if (layout.Compose is { Sequences.Count: > 0 })
+        {
+            var compiled = Compose.ComposeCompiler.Compile(layout);
+            foreach (var e in compiled.Errors) Add(Severity.Error, "KS081", "Compose: " + e);
+            foreach (var w in compiled.Warnings) Add(Severity.Warning, "KS080", "Compose: " + w);
+        }
+
+        // Layout tests
+        foreach (var t in LayoutTestRunner.Run(layout))
+        {
+            if (t.Passed) continue;
+            var label = t.Test.Name is { Length: > 0 } n ? $"\"{n}\" ({t.Test.Keys})" : t.Test.Keys;
+            Add(Severity.Error, t.Error is null ? "KS070" : "KS071", $"Test {label}: {t.Message}.");
+        }
         return r;
     }
 

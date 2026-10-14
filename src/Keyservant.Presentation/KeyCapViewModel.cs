@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Windows.Input;
+using Keyservant.Core.Geometry;
 using Keyservant.Core.Model;
 
 namespace Keyservant.Presentation;
@@ -14,6 +15,7 @@ public sealed class KeyCapViewModel : ObservableObject
     private string _shiftLabel = "";
     private bool _isDead;
     private bool _isSelected;
+    private bool _isHighlighted;
     private bool _isCharacterKey;
 
     internal KeyCapViewModel(EditorViewModel editor, PhysicalKey key)
@@ -39,6 +41,9 @@ public sealed class KeyCapViewModel : ObservableObject
 
     public bool IsSelected { get => _isSelected; set => SetProperty(ref _isSelected, value); }
 
+    /// <summary>Marked by a tool, e.g. keys that differ in the Compare tab.</summary>
+    public bool IsHighlighted { get => _isHighlighted; private set => SetProperty(ref _isHighlighted, value); }
+
     /// <summary>True when the key carries characters and can be edited.</summary>
     public bool IsCharacterKey { get => _isCharacterKey; private set => SetProperty(ref _isCharacterKey, value); }
 
@@ -53,8 +58,9 @@ public sealed class KeyCapViewModel : ObservableObject
         var target = Key.Extended ? layout.ScanCodes.E0.GetValueOrDefault((byte)Key.ScanCode, ScanCodeTarget.None) : layout.ScanCodes[Key.ScanCode];
         VirtualKey = target.IsNone ? null : target.VirtualKey;
         var def = VirtualKey is { } vk ? layout.FindKey(vk) : null;
-        IsCharacterKey = def is not null && Key.FixedLabel is null;
+        IsCharacterKey = VirtualKey is { } v && Key.FixedLabel is null && !VirtualKeys.IsImplicitControlKey(v);
 
+        IsHighlighted = VirtualKey is { } hv && _editor.HighlightedKeys.Contains(hv);
         if (Key.FixedLabel is not null || def is null)
         {
             Label = Key.FixedLabel switch

@@ -15,7 +15,7 @@ public class LayoutDllTests
         return KeyservantFormat.Serialize(layout);
     }
 
-    public static IEnumerable<object[]> Architectures => [[LayoutArchitecture.X64], [LayoutArchitecture.X86Wow64]];
+    public static IEnumerable<object[]> Architectures => [[LayoutArchitecture.X64], [LayoutArchitecture.X86Wow64], [LayoutArchitecture.Arm64]];
 
     [Theory]
     [MemberData(nameof(TestLayouts.Templates), MemberType = typeof(TestLayouts))]
@@ -65,7 +65,7 @@ public class LayoutDllTests
         var pe = PeImage.Parse(dll);
 
         Assert.Equal((ushort)arch, pe.Machine);
-        Assert.Equal(arch == LayoutArchitecture.X64, pe.IsPe32Plus);
+        Assert.Equal(arch != LayoutArchitecture.X86Wow64, pe.IsPe32Plus);
         Assert.Equal(PeImageWriter.ComputeChecksum(dll, pe.ChecksumOffset), pe.Checksum);
         Assert.Equal("kbdtest.dll", pe.ExportDllName());
         Assert.NotNull(pe.FindSection(".data"));
@@ -94,11 +94,11 @@ public class LayoutDllTests
         Assert.InRange(tables, data.VirtualAddress, data.VirtualAddress + data.VirtualSize - 1);
 
         var relocs = pe.ReadRelocations();
-        Assert.All(relocs, r => Assert.Equal(arch == LayoutArchitecture.X64 ? 10 : 3, r.Type));
+        Assert.All(relocs, r => Assert.Equal(arch == LayoutArchitecture.X86Wow64 ? 3 : 10, r.Type));
         // Each relocated slot holds an address inside the image, pointing into .data (or .text for nothing).
         foreach (var (rva, _) in relocs)
         {
-            var value = arch == LayoutArchitecture.X64 ? pe.ReadUInt64(rva) : pe.ReadUInt32(rva);
+            var value = arch == LayoutArchitecture.X86Wow64 ? pe.ReadUInt32(rva) : pe.ReadUInt64(rva);
             var target = pe.VaToRva(value)!.Value;
             Assert.Equal(".data", pe.SectionOf(target)!.Name);
         }

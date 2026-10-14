@@ -24,6 +24,9 @@ public sealed record InstalledLayout
     /// <summary>A problem found while listing, such as a missing DLL; null when the layout is healthy.</summary>
     public string? Problem { get; init; }
 
+    /// <summary>For a test install: when it is reverted automatically. Null for normal installs.</summary>
+    public DateTimeOffset? TemporaryUntil { get; init; }
+
     /// <summary>The language this layout is offered under. Custom layouts carry it in the KLID's low word.</summary>
     public ushort LanguageId => ushort.TryParse(Klid.AsSpan(4), System.Globalization.NumberStyles.HexNumber, null, out var id) ? id : (ushort)0;
 

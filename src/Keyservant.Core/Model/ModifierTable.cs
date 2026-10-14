@@ -73,6 +73,21 @@ public sealed class ModifierTable
         return column;
     }
 
+    /// <summary>
+    /// Removes a column; later columns move down by one. Callers must also drop key outputs stored under the
+    /// column's state (see <see cref="KeyboardLayout.RemoveShiftState"/>).
+    /// </summary>
+    public void RemoveColumn(int column)
+    {
+        for (var i = 0; i < ModNumber.Count; i++)
+        {
+            if (ModNumber[i] == Invalid) continue;
+            if (ModNumber[i] == column) ModNumber[i] = Invalid;
+            else if (ModNumber[i] > column) ModNumber[i]--;
+        }
+        while (ModNumber.Count > 1 && ModNumber[^1] == Invalid) ModNumber.RemoveAt(ModNumber.Count - 1);
+    }
+
     private void EnsureModifierKeys(ModifierBits bits)
     {
         void Need(ModifierBits bit, byte vk)

@@ -5,7 +5,7 @@ using Keyservant.Core.Model;
 namespace Keyservant.Presentation;
 
 /// <summary>One composition row: base → result.</summary>
-public sealed class DeadKeyEntryViewModel : ObservableObject
+public sealed class DeadKeyEntryViewModel : ObservableObject, ICharacterTarget
 {
     private readonly DeadKeyViewModel _owner;
     private string _base;
@@ -25,7 +25,11 @@ public sealed class DeadKeyEntryViewModel : ObservableObject
 
     public string Base { get => _base; set { if (SetProperty(ref _base, value)) _owner.Commit(); } }
 
-    public string Result { get => _result; set { if (SetProperty(ref _result, value)) _owner.Commit(); } }
+    public string Result { get => _result; set { if (SetProperty(ref _result, value)) { OnPropertyChanged(nameof(ResultName)); _owner.Commit(); } } }
+
+    public string ResultName => OutputRowViewModel.Describe(_result);
+
+    public void PickCharacter(string text) => Result = text;
 
     /// <summary>The result is itself a dead key (e.g. dot below, then macron → ṝ).</summary>
     public bool Chained { get => _chained; set { if (SetProperty(ref _chained, value)) _owner.Commit(); } }
@@ -65,7 +69,7 @@ public sealed class DeadKeyViewModel : ObservableObject
         {
             if (_definition.Name == value) return;
             _definition.Name = string.IsNullOrWhiteSpace(value) ? null : value;
-            _owner.Changed();
+            _owner.Changed($"deadname:{(int)_definition.Accent}");
             OnPropertyChanged();
         }
     }
@@ -92,7 +96,7 @@ public sealed class DeadKeyViewModel : ObservableObject
             if (e.ToEntry() is { } entry && _definition.Find(entry.Base) is null) _definition.Entries.Add(entry);
         }
         OnPropertyChanged(nameof(Count));
-        _owner.Changed();
+        _owner.Changed($"dead:{(int)_definition.Accent}");
     }
 }
 
@@ -107,11 +111,25 @@ public sealed class DeadKeysViewModel : ObservableObject
     {
         _editor = editor;
         AddDeadKeyCommand = new RelayCommand(AddDeadKey);
+        RemoveDeadKeyCommand = new RelayCommand(RemoveSelected, () => _selected is not null);
+        AddCommonCommand = new RelayCommand(p => AddCommon(p as string));
     }
+
+    public ICommand RemoveDeadKeyCommand { get; }
+
+    /// <summary>Adds a dead key for a well-known diacritic with all its Latin compositions (parameter: the combining mark).</summary>
+    public ICommand AddCommonCommand { get; }
+
+    /// <summary>Well-known diacritics for the "add with compositions" menu.</summary>
+    public IReadOnlyList<Keyservant.Core.Unicode.Diacritic> CommonDiacritics => Keyservant.Core.Unicode.Diacritics.All;
 
     public ObservableCollection<DeadKeyViewModel> DeadKeys { get; } = [];
 
-    public DeadKeyViewModel? Selected { get => _selected; set => SetProperty(ref _selected, value); }
+    public DeadKeyViewModel? Selected
+    {
+        get => _selected;
+        set { if (SetProperty(ref _selected, value)) ((RelayCommand)RemoveDeadKeyCommand).NotifyCanExecuteChanged(); }
+    }
 
     /// <summary>Accent for a new dead key: a character or U+XXXX.</summary>
     public string NewAccent { get => _newAccent; set => SetProperty(ref _newAccent, value); }
@@ -136,5 +154,39 @@ public sealed class DeadKeysViewModel : ObservableObject
         Changed();
     }
 
-    internal void Changed() => _editor.MarkChanged();
+    private void RemoveSelected()
+    {
+        if (_selected is null) return;
+        var accent = _selected.AccentChar;
+        var layout = _editor.Layout;
+        var users = layout.Keys.SelectMany(k => k.Outputs.Where(o => o.Value.IsDead && o.Value.Accent == accent).Select(o => (k.VirtualKey, o.Key))).ToList();
+        foreach (var (vk, state) in users) layout.SetOutput(vk, state, null);
+        foreach (var d in layout.DeadKeys)
+            for (var i = d.Entries.Count - 1; i >= 0; i--)
+                if (d.Entries[i].Chained && d.Entries[i].Result == accent) d.Entries.RemoveAt(i);
+        layout.DeadKeys.RemoveAll(d => d.Accent == accent);
+        _editor.LayoutChangedExternally(users.Count == 0 ? "Removed the dead key." : $"Removed the dead key and its {users.Count} key assignment(s).");
+    }
+
+    private void AddCommon(string? combining)
+    {
+        if (combining is not { Length: 1 } || Keyservant.Core.Unicode.Diacritics.Find(combining[0]) is not { } diacritic) return;
+        var accent = diacritic.Spacing ?? diacritic.Combining;
+        var def = _editor.Layout.GetOrAddDeadKey(accent);
+        def.Name ??= diacritic.Name;
+        if (def.Find(' ') is null) def.Entries.Add(new DeadKeyEntry(' ', accent));
+        var added = 0;
+        foreach (var (b, r) in Keyservant.Core.Unicode.Diacritics.Compositions(diacritic.Combining))
+        {
+            if (def.Find(b) is not null) continue;
+            def.Entries.Add(new DeadKeyEntry(b, r));
+            added++;
+        }
+        Load(_editor.Layout);
+        Selected = DeadKeys.First(d => d.AccentChar == accent);
+        _editor.MarkChanged();
+        _editor.Status = $"Dead key {diacritic.Name} with {added} compositions. Put it on a key on the Keys tab (tick \"Dead key\").";
+    }
+
+    internal void Changed(string? group = null) => _editor.MarkChanged(group);
 }

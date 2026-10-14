@@ -30,4 +30,13 @@ public interface IPrivilegedOperations
     Task<OperationResult> UninstallAsync(string klid);
 
     Task<OperationResult> RepairAsync();
+
+    /// <summary>
+    /// Installs the layout for <paramref name="minutes"/> minutes; Windows removes it again automatically
+    /// unless <see cref="KeepAsync"/> is called.
+    /// </summary>
+    Task<OperationResult> InstallTemporaryAsync(string layoutFile, int minutes);
+
+    /// <summary>Turns a test install into a normal install.</summary>
+    Task<OperationResult> KeepAsync(string klid);
 }

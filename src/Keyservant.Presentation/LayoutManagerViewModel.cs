@@ -17,7 +17,17 @@ public sealed class LayoutItemViewModel : ObservableObject
         _isEnabled = layout.IsEnabled;
         UninstallCommand = new AsyncRelayCommand(() => _owner.UninstallAsync(this), () => layout.IsCustom, _owner.ReportError);
         EditCopyCommand = new RelayCommand(() => _owner.EditCopy(this));
+        KeepCommand = new AsyncRelayCommand(() => _owner.KeepAsync(this), () => layout.TemporaryUntil is not null, _owner.ReportError);
     }
+
+    /// <summary>A test install that Windows removes again at <see cref="InstalledLayout.TemporaryUntil"/>.</summary>
+    public bool IsTemporary => Layout.TemporaryUntil is not null;
+
+    public string TemporaryText => Layout.TemporaryUntil is { } until
+        ? until <= DateTimeOffset.Now ? "Test install: expired, will be removed shortly." : $"Test install: removed automatically at {until.ToLocalTime():t}."
+        : "";
+
+    public ICommand KeepCommand { get; }
 
     public InstalledLayout Layout { get; private set; }
 
@@ -25,7 +35,7 @@ public sealed class LayoutItemViewModel : ObservableObject
     public string Klid => Layout.Klid;
     public string LayoutFile => Layout.LayoutFile;
     public bool IsCustom => Layout.IsCustom;
-    public string Kind => Layout.IsCustom ? "Custom" : "Windows";
+    public string Kind => Layout.IsCustom ? (Layout.TemporaryUntil is null ? "Custom" : "Custom (test)") : "Windows";
     public string? Problem => Layout.Problem;
     public bool HasProblem => Layout.Problem is not null;
 
@@ -148,6 +158,9 @@ public sealed class LayoutManagerViewModel : ObservableObject
         if (!ok) return;
         await Run(() => _privileged.UninstallAsync(item.Klid), $"Uninstalled {item.Name}.");
     }
+
+    internal async Task KeepAsync(LayoutItemViewModel item) =>
+        await Run(() => _privileged.KeepAsync(item.Klid), $"{item.Name} is now installed permanently.");
 
     internal void EditCopy(LayoutItemViewModel item)
     {

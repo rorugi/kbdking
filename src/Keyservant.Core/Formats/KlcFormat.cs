@@ -349,8 +349,11 @@ public sealed class KlcFormat : ILayoutFormat
         output.Write(Encoding.Unicode.GetBytes(text));
     }
 
-    public static string Serialize(KeyboardLayout layout, ConversionReport report)
+    public static string Serialize(KeyboardLayout source, ConversionReport report)
     {
+        if (source.Compose is { Sequences.Count: > 0 }) report.Warn("Compose sequences are exported as chained dead keys and a remapped key.");
+        if (source.Tests.Count > 0) report.Warn("Layout tests are not stored in .klc files.");
+        var layout = Compose.ComposeCompiler.Compile(source).Layout;
         var m = layout.Metadata;
         var sb = new StringBuilder();
         void Line(string s = "") => sb.Append(s).Append("\r\n");

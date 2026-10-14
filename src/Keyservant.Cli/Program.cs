@@ -9,13 +9,13 @@ using Keyservant.Platform;
 
 namespace Keyservant.Cli;
 
-internal static class Program
+internal static partial class Program
 {
     public const int Ok = 0, Failed = 1, Usage = 2, Invalid = 3, Declined = 4;
 
     private static readonly HashSet<string> Flags = new(StringComparer.OrdinalIgnoreCase)
     {
-        "help", "h", "version", "no-wow64", "yes", "y", "json", "all", "custom",
+        "help", "h", "version", "no-wow64", "no-arm64", "yes", "y", "json", "all", "custom", "apply", "stickers",
     };
 
     private static TextWriter Out = Console.Out;
@@ -67,7 +67,14 @@ internal static class Program
                 "convert" => Convert(cmd),
                 "build" => Build(cmd),
                 "package" => Package(cmd),
-                "list" or "enable" or "disable" or "import" or "install" or "uninstall" or "repair" =>
+                "test" => RunTests(cmd),
+                "suggest" => Suggest(cmd),
+                "compose" => ComposeCommand(cmd),
+                "analyze" => Analyze(cmd),
+                "diff" => Diff(cmd),
+                "render" => Render(cmd),
+                "unicode" => UnicodeSearch(cmd),
+                "list" or "enable" or "disable" or "import" or "install" or "uninstall" or "repair" or "keep" or "cleanup" =>
                     OperatingSystem.IsWindows() ? RunWindowsCommand(args[0].ToLowerInvariant(), cmd, args) : NotWindows(),
                 _ => throw new UsageException($"Unknown command '{args[0]}'. Run 'keyservant help' for the list of commands."),
             };
@@ -101,12 +108,31 @@ internal static class Program
               keyservant templates                         List built-in starting points
               keyservant new <template> -o <file>          Create a .keyservant file from a template
                          [--name <name>] [--dll <name>] [--locale <tag>]
-              keyservant validate <file>                   Check a layout for problems
-              keyservant convert <input> <output>          Convert between .keyservant, .klc, .dll and .c
-              keyservant build <file> [-o <dir>]           Build the layout DLLs (x64 and WOW64)
-                         [--no-wow64]
-              keyservant package <file> -o <setup.exe>     Create a standalone installer
-                         [--stub <path>]
+              keyservant validate <file>                   Check a layout for problems (including its tests)
+              keyservant test <file>                       Run the layout's tests
+              keyservant convert <input> <output>          Convert between .keyservant, .klc, .dll, .keylayout,
+                                                           .xkb (+ .XCompose) and .c
+              keyservant diff <a> <b> [--svg <out.svg>]    Show what changed between two layouts
+              keyservant build <file> [-o <dir>]           Build the layout DLLs (x64, WOW64, ARM64)
+                         [--no-wow64] [--no-arm64]
+              keyservant render <file> -o <out.svg>        Draw the keyboard, or stickers to print
+                         [--stickers] [--shape iso|ansi|jis|abnt]
+
+            Characters and typing
+              keyservant suggest <file> --chars "āīū…"     Propose where to put characters
+                         [--text <sample.txt>] [--apply] [-o <out>]
+              keyservant compose import <file> <.XCompose> Add compose sequences [--key "E0 5D"]
+              keyservant compose export <file> <out>       Write the sequences as .XCompose
+              keyservant compose list <file>               List the sequences
+              keyservant analyze <file> <text.txt>         Typing effort and a heatmap for a text
+                         [--heatmap <out.svg>] [--compare <other layout>]
+              keyservant unicode <words or code>           Search characters by name, e.g. "a macron"
+
+            Packages
+              keyservant package <file> -o <setup.exe>     Standalone installer [--stub <path>]
+              keyservant package <file> --msi <out.msi>    MSI for Group Policy / Intune (needs WiX: dotnet tool install -g wix)
+              keyservant package <file> --wix <dir>        WiX source only
+              keyservant package <file> --intune <dir>     Intune Win32 app folder [--stub <path>]
 
             This PC (Windows)
               keyservant list [--custom]                   List installed layouts
@@ -114,10 +140,13 @@ internal static class Program
               keyservant disable <klid>                    Remove a layout from your switcher
               keyservant import <klid|dll> -o <file>       Save an installed layout as a .keyservant file
               keyservant install <file>                    Install a layout (asks for admin rights)
+                         [--temporary <minutes>]           ...as a test install that reverts itself
+              keyservant keep <klid>                       Keep a test install permanently
+              keyservant cleanup                           Remove expired test installs
               keyservant uninstall <klid> [--yes]          Uninstall a custom layout (asks for admin rights)
               keyservant repair                            Restore layouts lost in Windows updates
 
-            Exit codes: 0 ok, 1 failed, 2 usage error, 3 layout has errors, 4 admin prompt declined.
+            Exit codes: 0 ok, 1 failed, 2 usage error, 3 layout has errors or failing tests, 4 admin prompt declined.
             """);
     }
 
@@ -137,6 +166,8 @@ internal static class Program
         "install" => Install(cmd, args),
         "uninstall" => Uninstall(cmd, args),
         "repair" => Repair(cmd, args),
+        "keep" => Keep(cmd, args),
+        "cleanup" => Cleanup(cmd, args),
         _ => throw new UsageException($"Unknown command '{name}'."),
     };
 
@@ -208,6 +239,12 @@ internal static class Program
         var layout = Load(input);
         var report = new ConversionReport();
         Formats.WriteFile(layout, output, report);
+        if (output.EndsWith(".xkb", StringComparison.OrdinalIgnoreCase))
+        {
+            var companion = Path.ChangeExtension(output, ".XCompose");
+            File.WriteAllText(companion, XkbSymbolsFormat.WriteXCompose(layout));
+            Out.WriteLine($"Wrote {companion} (dead-key compositions; add its lines to ~/.XCompose).");
+        }
         PrintReport(report);
         Out.WriteLine($"Wrote {output}{(report.IsLossless ? "" : $" ({report.Warnings.Count} warning{(report.Warnings.Count == 1 ? "" : "s")})")}.");
         return Ok;
@@ -218,10 +255,11 @@ internal static class Program
         var path = cmd.Arg(0, "layout file");
         var outDir = cmd.Option("output", "o") ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path))!, "build");
         var noWow = cmd.Flag("no-wow64");
+        var noArm = cmd.Flag("no-arm64");
         cmd.EnsureNoUnknownOptions();
 
         var layout = Load(path);
-        var result = LayoutDllBuilder.Build(layout, new LayoutBuildOptions { IncludeWow64 = !noWow });
+        var result = LayoutDllBuilder.Build(layout, new LayoutBuildOptions { IncludeWow64 = !noWow, IncludeArm64 = !noArm });
         PrintValidation(result.Validation);
         Directory.CreateDirectory(Path.Combine(outDir, "x64"));
         File.WriteAllBytes(Path.Combine(outDir, "x64", result.FileName), result.X64);
@@ -232,23 +270,80 @@ internal static class Program
             File.WriteAllBytes(Path.Combine(outDir, "wow64", result.FileName), result.Wow64);
             Out.WriteLine($"Wrote {Path.Combine(outDir, "wow64", result.FileName)}");
         }
+        if (result.Arm64 is not null)
+        {
+            Directory.CreateDirectory(Path.Combine(outDir, "arm64"));
+            File.WriteAllBytes(Path.Combine(outDir, "arm64", result.FileName), result.Arm64);
+            Out.WriteLine($"Wrote {Path.Combine(outDir, "arm64", result.FileName)}");
+        }
         return Ok;
     }
 
     private static int Package(CommandLine cmd)
     {
         var path = cmd.Arg(0, "layout file");
-        var output = cmd.Option("output", "o") ?? throw new UsageException("Missing -o <setup.exe>.");
+        var output = cmd.Option("output", "o");
+        var msi = cmd.Option("msi");
+        var wix = cmd.Option("wix");
+        var intune = cmd.Option("intune");
         var stub = cmd.Option("stub") ?? Path.Combine(AppContext.BaseDirectory, "Keyservant.Stub.exe");
         cmd.EnsureNoUnknownOptions();
-        if (!File.Exists(stub)) throw new IOException($"Installer stub not found at {stub}. Pass --stub <path>.");
+        if (output is null && msi is null && wix is null && intune is null)
+            throw new UsageException("Say what to create: -o <setup.exe>, --msi <file>, --wix <dir> or --intune <dir>.");
 
         var layout = Load(path);
         var result = LayoutDllBuilder.Build(layout);
         PrintValidation(result.Validation);
-        LayoutPackage.Create(layout, result).WriteInstaller(stub, output);
-        Out.WriteLine($"Wrote {output}. Run it on any Windows PC to install \"{layout.Metadata.Name}\".");
+        var package = LayoutPackage.Create(layout, result);
+
+        if (output is not null || intune is not null)
+        {
+            if (!File.Exists(stub)) throw new IOException($"Installer stub not found at {stub}. Pass --stub <path>.");
+        }
+        if (output is not null)
+        {
+            package.WriteInstaller(stub, output);
+            Out.WriteLine($"Wrote {output}. Run it on any Windows PC to install \"{layout.Metadata.Name}\".");
+        }
+        if (intune is not null)
+        {
+            EnterprisePackaging.WriteIntuneFolder(package, stub, intune);
+            Out.WriteLine($"Wrote the Intune app folder {intune}. See README.txt in it for the next steps.");
+        }
+        if (wix is not null || msi is not null)
+        {
+            var dir = wix ?? Path.Combine(Path.GetTempPath(), $"keyservant-wix-{Guid.NewGuid():N}");
+            var wxs = EnterprisePackaging.WriteWixProject(package, dir);
+            Out.WriteLine($"Layout ID in the MSI: {EnterprisePackaging.MsiKlid(package)}");
+            if (wix is not null) Out.WriteLine($"Wrote {wxs}.");
+            if (msi is not null)
+            {
+                var code = RunTool("wix", ["build", wxs, "-arch", "x64", "-o", Path.GetFullPath(msi)], dir);
+                if (wix is null) Directory.Delete(dir, recursive: true);
+                if (code != 0) return Failed;
+                Out.WriteLine($"Wrote {msi}.");
+            }
+        }
         return Ok;
+    }
+
+    private static int RunTool(string tool, IEnumerable<string> args, string workingDirectory)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo(tool) { WorkingDirectory = workingDirectory, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        try
+        {
+            using var p = System.Diagnostics.Process.Start(psi)!;
+            var output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
+            p.WaitForExit();
+            if (p.ExitCode != 0) Err.WriteLine(output.Trim());
+            return p.ExitCode;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            Err.WriteLine($"error: '{tool}' was not found. Install the WiX toolset with: dotnet tool install --global wix --version 5.*");
+            return Failed;
+        }
     }
 
     // ---------------------------------------------------------------- this PC
@@ -317,14 +412,24 @@ internal static class Program
     private static int Install(CommandLine cmd, string[] rawArgs)
     {
         var path = cmd.Arg(0, "layout file");
+        var temporary = cmd.Option("temporary");
         cmd.EnsureNoUnknownOptions();
+        int? minutes = temporary is null ? null
+            : int.TryParse(temporary, out var m) && m is > 0 and <= 7 * 24 * 60 ? m
+            : throw new UsageException("--temporary needs a number of minutes (1 to 10080).");
         if (!Elevation.IsAdministrator) return Relaunch(rawArgs, Path.GetFullPath(path));
 
         var layout = Load(path);
         var result = LayoutDllBuilder.Build(layout);
         PrintValidation(result.Validation);
-        var installed = new WindowsLayoutSystem().Install(LayoutPackage.Create(layout, result));
+        var system = new WindowsLayoutSystem();
+        var package = LayoutPackage.Create(layout, result);
+        var installed = minutes is { } min
+            ? system.InstallTemporary(package, TimeSpan.FromMinutes(min), Environment.ProcessPath ?? "keyservant.exe")
+            : system.Install(package);
         Out.WriteLine($"Installed {installed.Name} as {installed.Klid} and added it to your switcher (Win+Space).");
+        if (installed.TemporaryUntil is { } until)
+            Out.WriteLine($"This is a test install: it is removed at {until.ToLocalTime():t}. Run 'keyservant keep {installed.Klid}' to keep it.");
 
         // Remember the KLID so the next install updates this layout instead of adding another one.
         if (layout.Metadata.LayoutId is null && path.EndsWith(".keyservant", StringComparison.OrdinalIgnoreCase))

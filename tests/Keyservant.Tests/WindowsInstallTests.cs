@@ -3,6 +3,7 @@ using System.Runtime.Versioning;
 using System.Text;
 using Keyservant.Binary;
 using Keyservant.Binary.Packaging;
+using Keyservant.Core.Compose;
 using Keyservant.Core.Model;
 using Keyservant.Platform;
 
@@ -118,5 +119,85 @@ public partial class WindowsInstallTests
         {
             system.Uninstall(installed.Klid);
         }
+    }
+
+    [WindowsInstallFact]
+    public void Compose_sequences_type_through_windows()
+    {
+        var layout = TestLayouts.Sample("german-austria-iast");
+        layout.Metadata.DllName = "kbdkscmp";
+        layout.Metadata.Name = "Keyservant compose test";
+        layout.Compose = new ComposeDefinition();
+        layout.Compose.Sequences.Add(new ComposeSequence(".r", "ṛ"));
+        layout.Compose.Sequences.Add(new ComposeSequence("--", "–"));
+        var composeVk = ComposeCompiler.Compile(layout).Layout.ScanCodes.E0[0x5D].VirtualKey;
+        var system = new WindowsLayoutSystem();
+        var installed = system.Install(LayoutPackage.Create(layout, LayoutDllBuilder.Build(layout)));
+        try
+        {
+            var hkl = LoadKeyboardLayout(installed.Klid, KlfNotEllShell);
+            Assert.NotEqual(0, hkl);
+            try
+            {
+                Flush(hkl);
+                var dotBelow = string.Concat(new[] { composeVk, (byte)0xBE, (byte)'R' }.Select(vk => Press(hkl, vk, ShiftState.Base, false).Text));
+                Flush(hkl);
+                var dash = string.Concat(new[] { composeVk, (byte)0xBD, (byte)0xBD }.Select(vk => Press(hkl, vk, ShiftState.Base, false).Text));
+                Assert.Equal("ṛ", dotBelow);
+                Assert.Equal("–", dash);
+            }
+            finally
+            {
+                UnloadKeyboardLayout(hkl);
+            }
+        }
+        finally
+        {
+            system.Uninstall(installed.Klid);
+        }
+    }
+
+    [WindowsInstallFact]
+    public void Test_installs_schedule_their_own_removal()
+    {
+        var layout = TestLayouts.Sample("german-austria-iast");
+        layout.Metadata.DllName = "kbdkstmp";
+        layout.Metadata.Name = "Keyservant temporary test";
+        var system = new WindowsLayoutSystem();
+        var package = LayoutPackage.Create(layout, LayoutDllBuilder.Build(layout));
+        var installed = system.InstallTemporary(package, TimeSpan.FromMinutes(30), Environment.ProcessPath!);
+        try
+        {
+            Assert.NotNull(system.GetLayouts().Single(l => l.Klid == installed.Klid).TemporaryUntil);
+            Assert.True(TaskExists(installed.Klid));
+            Assert.Empty(system.CleanupExpired()); // not expired yet
+
+            system.Keep(installed.Klid);
+            Assert.Null(system.GetLayouts().Single(l => l.Klid == installed.Klid).TemporaryUntil);
+            Assert.False(TaskExists(installed.Klid));
+
+            // Expired test installs are removed by the cleanup run.
+            installed = system.InstallTemporary(package, TimeSpan.FromMinutes(30), Environment.ProcessPath!);
+            using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Control\Keyboard Layouts\{installed.Klid}", writable: true)!)
+                key.SetValue(WindowsLayoutSystem.TemporaryValue, DateTimeOffset.UtcNow.AddMinutes(-1).ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+            Assert.Single(system.CleanupExpired());
+            Assert.DoesNotContain(system.GetLayouts(), l => l.Klid == installed.Klid);
+            Assert.False(TaskExists(installed.Klid));
+        }
+        finally
+        {
+            if (system.GetLayouts().Any(l => l.Klid == installed.Klid)) system.Uninstall(installed.Klid);
+        }
+    }
+
+    private static bool TaskExists(string klid)
+    {
+        using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("schtasks.exe", ["/Query", "/TN", $@"{WindowsLayoutSystem.TaskFolder}\Revert {klid}"])
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        })!;
+        p.WaitForExit();
+        return p.ExitCode == 0;
     }
 }

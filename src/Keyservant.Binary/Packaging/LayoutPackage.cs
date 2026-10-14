@@ -25,6 +25,7 @@ public sealed class LayoutPackage
 
     public required byte[] DllX64 { get; init; }
     public byte[]? DllWow64 { get; init; }
+    public byte[]? DllArm64 { get; init; }
 
     /// <summary>The .keyservant source, so a repaired or exported layout keeps all its information.</summary>
     public required string LayoutSource { get; init; }
@@ -39,6 +40,7 @@ public sealed class LayoutPackage
         LayoutId = layout.Metadata.LayoutId,
         DllX64 = build.X64,
         DllWow64 = build.Wow64,
+        DllArm64 = build.Arm64,
         LayoutSource = KeyservantFormat.Serialize(layout),
     };
 
@@ -71,6 +73,7 @@ public sealed class LayoutPackage
             ("x64/" + DllFileName, DllX64),
         };
         if (DllWow64 is not null) entries.Add(("wow64/" + DllFileName, DllWow64));
+        if (DllArm64 is not null) entries.Add(("arm64/" + DllFileName, DllArm64));
 
         using var w = new BinaryWriter(output, Encoding.UTF8, leaveOpen: true);
         w.Write(HeaderMagic);
@@ -112,6 +115,7 @@ public sealed class LayoutPackage
             LayoutId = manifest["layoutId"]?.GetValue<string>(),
             DllX64 = entries["x64/" + dll],
             DllWow64 = entries.GetValueOrDefault("wow64/" + dll),
+            DllArm64 = entries.GetValueOrDefault("arm64/" + dll),
             LayoutSource = Encoding.UTF8.GetString(entries[LayoutEntry]),
         };
     }

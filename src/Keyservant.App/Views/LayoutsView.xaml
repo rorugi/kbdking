@@ -77,8 +77,19 @@
                                 Foreground="{ThemeResource SystemFillColorCriticalBrush}"
                                 Text="{x:Bind Problem}"
                                 Visibility="{x:Bind local:Converters.VisibleIf(HasProblem)}" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                Text="{x:Bind TemporaryText}"
+                                Visibility="{x:Bind local:Converters.VisibleIf(IsTemporary)}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button
+                                Content="Keep"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Command="{x:Bind KeepCommand}"
+                                ToolTipService.ToolTip="Make this test install permanent"
+                                Visibility="{x:Bind local:Converters.VisibleIf(IsTemporary)}" />
                             <Button Content="Edit a copy" Command="{x:Bind EditCopyCommand}" />
                             <Button
                                 Content="Uninstall"

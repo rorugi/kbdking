@@ -11,6 +11,9 @@ public enum LayoutArchitecture : ushort
 
     /// <summary>32-bit DLL for SysWOW64, with 64-bit pointers inside the tables (WOW64 layout).</summary>
     X86Wow64 = 0x014C,
+
+    /// <summary>64-bit DLL for System32 on Windows on ARM.</summary>
+    Arm64 = 0xAA64,
 }
 
 /// <summary>
@@ -51,7 +54,7 @@ internal sealed class PeImageWriter
 
     public ushort ImageVersionMinor { get; init; }
 
-    private bool Is64 => Architecture == LayoutArchitecture.X64;
+    private bool Is64 => Architecture is LayoutArchitecture.X64 or LayoutArchitecture.Arm64;
 
     private ulong ImageBase => Is64 ? 0x0000000180000000UL : 0x10000000UL;
 
@@ -72,7 +75,7 @@ internal sealed class PeImageWriter
         };
 
         // Code size is fixed, so we can lay out RVAs before writing the bytes.
-        var stubSize = Is64 ? 7 + 1 : 5 + 2 + 1;
+        var stubSize = Architecture switch { LayoutArchitecture.X64 => 7 + 1, LayoutArchitecture.Arm64 => 12, _ => 5 + 2 + 1 };
         var exportDirSize = 40 + 4 + 4 + 2 + DllFileName.Length + 1 + ExportName.Length + 1;
         uint rva = SectionAlignment;
         text.Rva = rva; rva += AlignUp((uint)stubSize, SectionAlignment);
@@ -93,7 +96,17 @@ internal sealed class PeImageWriter
         if (ExportTarget.Section != Data) throw new InvalidOperationException("The export target must be in the data section.");
 
         // Write the stub.
-        if (Is64)
+        if (Architecture == LayoutArchitecture.Arm64)
+        {
+            // adrp x0, target@page ; add x0, x0, target@pageoff ; ret   (PC-relative, no relocation needed)
+            var pageDelta = ((long)(targetRva & ~0xFFFu) - (text.Rva & ~0xFFFu)) >> 12;
+            var immlo = (uint)(pageDelta & 0x3);
+            var immhi = (uint)((pageDelta >> 2) & 0x7FFFF);
+            text.WriteUInt32(0x90000000u | immlo << 29 | immhi << 5);
+            text.WriteUInt32(0x91000000u | (targetRva & 0xFFFu) << 10);
+            text.WriteUInt32(0xD65F03C0u);
+        }
+        else if (Is64)
         {
             // lea rax, [rip + disp32] ; ret
             var disp = (int)(targetRva - (text.Rva + 7));

@@ -36,4 +36,16 @@ public interface ILayoutSystem
     /// Requires administrator rights.
     /// </summary>
     RepairReport Repair();
+
+    /// <summary>
+    /// Installs a layout for a limited time. A scheduled task runs <paramref name="cleanupExecutable"/>
+    /// with "cleanup" when it expires, so the layout is removed even if the app is closed.
+    /// </summary>
+    InstalledLayout InstallTemporary(LayoutPackage package, TimeSpan duration, string cleanupExecutable);
+
+    /// <summary>Turns a test install into a normal install.</summary>
+    void Keep(string klid);
+
+    /// <summary>Uninstalls test installs whose time is up. Returns what was removed.</summary>
+    IReadOnlyList<string> CleanupExpired();
 }

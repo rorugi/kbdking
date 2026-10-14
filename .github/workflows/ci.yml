@@ -72,7 +72,7 @@ jobs:
           $counters = ([xml](Get-Content TestResults/install.trx)).TestRun.ResultSummary.Counters
           Write-Output "::notice title=Install-and-type test::passed=$($counters.passed) failed=$($counters.failed) skipped=$($counters.notExecuted)"
           # The test must actually run here; a skip would hide a broken setup.
-          if ($failedRun -ne 0 -or [int]$counters.passed -lt 1) { exit 1 }
+          if ($failedRun -ne 0 -or [int]$counters.passed -lt 3) { exit 1 }
 
       - name: Publish CLI
         run: dotnet publish src/Keyservant.Cli/Keyservant.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o artifacts/cli
@@ -83,12 +83,62 @@ jobs:
       - name: Create the sample's standalone installer
         run: artifacts/cli/keyservant.exe package samples/german-austria-iast.keyservant -o artifacts/german-austria-iast-setup.exe --stub artifacts/stub/Keyservant.Stub.exe
 
+      - name: Create the sample's MSI and Intune package
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          artifacts/cli/keyservant.exe package samples/german-austria-iast.keyservant --msi artifacts/german-austria-iast.msi
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          artifacts/cli/keyservant.exe package samples/german-austria-iast.keyservant --intune artifacts/intune --stub artifacts/stub/Keyservant.Stub.exe
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      # Installs the MSI quietly, checks the registration and removes it again.
+      - name: MSI install test
+        shell: pwsh
+        run: |
+          $p = Start-Process msiexec.exe -ArgumentList '/i', "$PWD\artifacts\german-austria-iast.msi", '/qn', '/l*v', 'msi-install.log' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content msi-install.log -Tail 40; exit 1 }
+          if (-not (Test-Path "$env:SystemRoot\System32\kbdiast.dll")) { Write-Output 'DLL missing'; exit 1 }
+          $match = Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layouts' | Where-Object { (Get-ItemProperty $_.PSPath).'Layout File' -eq 'kbdiast.dll' }
+          if (-not $match) { Write-Output 'Registry entry missing'; exit 1 }
+          Write-Output "::notice title=MSI install test::Registered as $($match.PSChildName)"
+          & powershell -ExecutionPolicy Bypass -File artifacts/intune/detect.ps1
+          if ($LASTEXITCODE -ne 0) { Write-Output 'Intune detection script did not find the layout'; exit 1 }
+          $p = Start-Process msiexec.exe -ArgumentList '/x', "$PWD\artifacts\german-austria-iast.msi", '/qn' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { exit 1 }
+          if (Test-Path "$env:SystemRoot\System32\kbdiast.dll") { Write-Output 'DLL not removed'; exit 1 }
+
       - uses: actions/upload-artifact@v5
         with:
           name: windows-cli-and-installer
           path: |
             artifacts/cli/keyservant.exe
             artifacts/german-austria-iast-setup.exe
+            artifacts/german-austria-iast.msi
+            artifacts/intune/
+
+  arm64:
+    name: Windows on ARM64 (install-and-type test with the ARM64 DLL)
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install-and-type test
+        env:
+          KEYSERVANT_INSTALL_TESTS: "1"
+        shell: pwsh
+        run: |
+          Write-Output "OS architecture: $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture), process: $([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)"
+          dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release `
+            --filter "FullyQualifiedName~WindowsInstallTests" --logger "trx;LogFileName=install.trx" --results-directory TestResults
+          $failedRun = $LASTEXITCODE
+          $counters = ([xml](Get-Content TestResults/install.trx)).TestRun.ResultSummary.Counters
+          Write-Output "::notice title=ARM64 install-and-type test::passed=$($counters.passed) failed=$($counters.failed) skipped=$($counters.notExecuted)"
+          if ($failedRun -ne 0 -or [int]$counters.passed -lt 3) { exit 1 }
 
   app:
     name: App (WinUI 3)
@@ -100,5 +150,8 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Build
+      - name: Build (x64)
         run: dotnet build src/Keyservant.App/Keyservant.App.csproj -c Release -p:Platform=x64
+
+      - name: Build (ARM64)
+        run: dotnet build src/Keyservant.App/Keyservant.App.csproj -c Release -p:Platform=ARM64

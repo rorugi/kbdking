@@ -2,7 +2,7 @@ using Keyservant.Cli;
 
 namespace Keyservant.Tests;
 
-public sealed class CliTests : IDisposable
+public sealed partial class CliTests : IDisposable
 {
     private readonly DirectoryInfo _dir = Directory.CreateTempSubdirectory("keyservant-cli");
 

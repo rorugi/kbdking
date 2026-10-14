@@ -14,7 +14,7 @@ internal static class KbdCSourceWriter
 {
     public static string Write(KeyboardLayout layout)
     {
-        var plan = KbdTablesPlan.Create(layout);
+        var plan = KbdTablesPlan.Create(Core.Compose.ComposeCompiler.Compile(layout).Layout);
         var sb = new StringBuilder();
         void L(string s = "") => sb.Append(s).Append('\n');
         static string H(int v) => "0x" + v.ToString("x4", CultureInfo.InvariantCulture);

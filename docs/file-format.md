@@ -143,3 +143,49 @@ codes:
 ```json
 "keyNames": {"01": "Esc", "0E": "Backspace", "39": "Space"}
 ```
+
+## compose (optional)
+
+A compose key and the sequences typed after it. Keyservant compiles them into chained dead keys when the
+layout is built, so they work in every app without extra software.
+
+```json
+"compose": {
+  "key": "E0 5D",
+  "accent": "⎄",
+  "sequences": [
+    [".r", "ṛ"],
+    ["--", "–"],
+    ["oc", "©"]
+  ]
+}
+```
+
+- `key`: the scan code of the compose key, `E0 5D` (the Menu key) by default; `E0 38` is the right Alt,
+  `3A` Caps Lock. Keyservant gives that key a free virtual key that types a dead key.
+- `accent`: what Windows shows while it waits for the rest of the sequence (default ⎄ U+2384).
+- `sequences`: `[keys, result]`. `keys` are the characters typed after the compose key, as they are typed
+  with this layout (so `"A"` means Shift+a). `result` must be a single BMP character. Intermediate steps
+  use private-use characters (U+E000–U+EFFF) as hidden dead keys.
+- A sequence that is a prefix of another one wins; the longer one is reported and dropped. Keys the layout
+  can't type are reported too.
+
+`keyservant compose import` reads `.XCompose` files (Linux, WinCompose) and keeps the `<Multi_key>` lines.
+
+## tests (optional)
+
+Checks that run with `keyservant test`, in the app after every change, and as part of validation (a
+failing test is an error, so the layout won't build):
+
+```json
+"tests": [
+  {"keys": "AltGr+. t", "expect": "ṭ"},
+  {"name": "long r", "keys": "AltGr+. AltGr+- r", "expect": "ṝ"},
+  {"keys": "Compose . r", "expect": "ṛ"}
+]
+```
+
+`keys` is a space-separated list of keystrokes. Each is an optional chain of modifiers (`Shift+`, `Ctrl+`,
+`Alt+`, `AltGr+`, `Kana+`, `Caps+`) and a key: a character means the key that types it without modifiers
+(a Shift-only character such as `A` implies Shift), `PLUS` means the + key, `Compose` the compose key,
+and anything else a virtual key name (`OEM_8`, `SPACE`, `NUMPAD1`).

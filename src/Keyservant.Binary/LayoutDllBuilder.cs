@@ -11,6 +11,9 @@ public sealed record LayoutBuildOptions
     /// <summary>Also build the 32-bit DLL for SysWOW64, used by 32-bit applications.</summary>
     public bool IncludeWow64 { get; init; } = true;
 
+    /// <summary>Also build the ARM64 DLL for Windows on ARM.</summary>
+    public bool IncludeArm64 { get; init; } = true;
+
     /// <summary>Embed the display-name string and version resources.</summary>
     public bool IncludeResources { get; init; } = true;
 
@@ -24,6 +27,7 @@ public sealed class LayoutBuildResult
     public required string FileName { get; init; }
     public required byte[] X64 { get; init; }
     public byte[]? Wow64 { get; init; }
+    public byte[]? Arm64 { get; init; }
     public required ValidationResult Validation { get; init; }
 
     /// <summary>Registry value for "Layout Display Name", pointing at the string resource in the DLL.</summary>
@@ -55,6 +59,7 @@ public static class LayoutDllBuilder
             FileName = fileName,
             X64 = BuildImage(layout, LayoutArchitecture.X64, fileName, options),
             Wow64 = options.IncludeWow64 ? BuildImage(layout, LayoutArchitecture.X86Wow64, fileName, options) : null,
+            Arm64 = options.IncludeArm64 ? BuildImage(layout, LayoutArchitecture.Arm64, fileName, options) : null,
             Validation = validation,
         };
     }
@@ -64,8 +69,9 @@ public static class LayoutDllBuilder
     {
         options ??= new LayoutBuildOptions();
         fileName ??= layout.Metadata.DllName.ToLowerInvariant() + ".dll";
+        var effective = Core.Compose.ComposeCompiler.Compile(layout).Layout;
         var data = new SectionBuffer(".data");
-        var tables = KbdTablesWriter.Write(layout, data);
+        var tables = KbdTablesWriter.Write(effective, data);
         var version = ParseVersion(layout.Metadata.Version);
 
         var writer = new PeImageWriter
