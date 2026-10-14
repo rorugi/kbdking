@@ -238,33 +238,10 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
         return layout;
     }
 
-    /// <summary>Picks a free KLID of the form Annn&lt;LANGID&gt;, as MSKLC does.</summary>
-    internal static string AllocateKlid(IEnumerable<string> existing, ushort languageId)
-    {
-        var used = new HashSet<string>(existing, StringComparer.OrdinalIgnoreCase);
-        for (var n = 0; n < 0x1000; n++)
-        {
-            var klid = string.Create(CultureInfo.InvariantCulture, $"A{n:X3}{languageId:X4}");
-            if (!used.Contains(klid)) return klid;
-        }
-        throw new LayoutSystemException("No free layout ID is left for this language.");
-    }
-
-    private static string AllocateKlid(RegistryKey root, ushort languageId) => AllocateKlid(root.GetSubKeyNames(), languageId);
-
-    /// <summary>Picks a "Layout Id" one higher than any in use.</summary>
-    internal static string AllocateLayoutId(IEnumerable<string?> existing)
-    {
-        var max = 0;
-        foreach (var id in existing)
-        {
-            if (int.TryParse(id, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var v)) max = Math.Max(max, v);
-        }
-        return (max + 1).ToString("X4", CultureInfo.InvariantCulture);
-    }
+    private static string AllocateKlid(RegistryKey root, ushort languageId) => LayoutIds.AllocateKlid(root.GetSubKeyNames(), languageId);
 
     private static string AllocateLayoutId(RegistryKey root) =>
-        AllocateLayoutId(root.GetSubKeyNames().Select(k =>
+        LayoutIds.AllocateLayoutId(root.GetSubKeyNames().Select(k =>
         {
             using var key = root.OpenSubKey(k);
             return key?.GetValue("Layout Id") as string;

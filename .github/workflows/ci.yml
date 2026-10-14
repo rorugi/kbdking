@@ -18,9 +18,9 @@ jobs:
     name: Engine and tests (Linux, clang oracle)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
@@ -42,7 +42,7 @@ jobs:
           done
 
       - name: Upload sample DLLs (for manual testing on Windows)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: sample-layout-dlls
           path: out/
@@ -51,9 +51,9 @@ jobs:
     name: Windows (tests, install-and-type test, CLI, installer stub)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
@@ -75,7 +75,7 @@ jobs:
       - name: Create the sample's standalone installer
         run: artifacts/cli/keyservant.exe package samples/german-austria-iast.keyservant -o artifacts/german-austria-iast-setup.exe --stub artifacts/stub/Keyservant.Stub.exe
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: windows-cli-and-installer
           path: |
@@ -86,9 +86,9 @@ jobs:
     name: App (WinUI 3)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 

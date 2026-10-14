@@ -68,16 +68,16 @@ public class PackagingAndPlatformTests
     [Fact]
     public void Klid_allocation_uses_msklc_style_ids()
     {
-        Assert.Equal("A0000C07", WindowsLayoutSystem.AllocateKlid(["00000407", "00000C07"], 0x0C07));
-        Assert.Equal("A0010C07", WindowsLayoutSystem.AllocateKlid(["A0000C07"], 0x0C07));
-        Assert.Equal("A0000409", WindowsLayoutSystem.AllocateKlid(["a0000c07"], 0x0409));
+        Assert.Equal("A0000C07", LayoutIds.AllocateKlid(["00000407", "00000C07"], 0x0C07));
+        Assert.Equal("A0010C07", LayoutIds.AllocateKlid(["A0000C07"], 0x0C07));
+        Assert.Equal("A0000409", LayoutIds.AllocateKlid(["a0000c07"], 0x0409));
     }
 
     [Fact]
     public void Layout_id_allocation_picks_one_above_the_maximum()
     {
-        Assert.Equal("00C2", WindowsLayoutSystem.AllocateLayoutId(["0001", null, "00C1", "junk"]));
-        Assert.Equal("0001", WindowsLayoutSystem.AllocateLayoutId([]));
+        Assert.Equal("00C2", LayoutIds.AllocateLayoutId(["0001", null, "00C1", "junk"]));
+        Assert.Equal("0001", LayoutIds.AllocateLayoutId([]));
     }
 
     [Fact]
