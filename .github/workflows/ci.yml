@@ -58,7 +58,16 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Test
-        run: dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release
+        shell: pwsh
+        run: |
+          dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release --logger "trx;LogFileName=all.trx" --results-directory TestResults
+          $failedRun = $LASTEXITCODE
+          foreach ($r in ([xml](Get-Content TestResults/all.trx)).TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' }) {
+            $stack = (("$($r.Output.ErrorInfo.StackTrace)" -split "`n") | Select-Object -First 4) -join "`n"
+            $msg = "$($r.Output.ErrorInfo.Message)`n$stack" -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'
+            Write-Output "::error title=$($r.testName)::$msg"
+          }
+          exit $failedRun
 
       # Installs a generated layout on the runner, types with it through ToUnicodeEx and uninstalls it.
       - name: Install-and-type test
@@ -69,6 +78,11 @@ jobs:
           dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release --no-build `
             --filter "FullyQualifiedName~WindowsInstallTests" --logger "trx;LogFileName=install.trx" --results-directory TestResults
           $failedRun = $LASTEXITCODE
+          foreach ($r in ([xml](Get-Content TestResults/install.trx)).TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' }) {
+            $stack = (("$($r.Output.ErrorInfo.StackTrace)" -split "`n") | Select-Object -First 4) -join "`n"
+            $msg = "$($r.Output.ErrorInfo.Message)`n$stack" -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'
+            Write-Output "::error title=$($r.testName)::$msg"
+          }
           $counters = ([xml](Get-Content TestResults/install.trx)).TestRun.ResultSummary.Counters
           Write-Output "::notice title=Install-and-type test::passed=$($counters.passed) failed=$($counters.failed) skipped=$($counters.notExecuted)"
           # The test must actually run here; a skip would hide a broken setup.
@@ -136,6 +150,11 @@ jobs:
           dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release `
             --filter "FullyQualifiedName~WindowsInstallTests" --logger "trx;LogFileName=install.trx" --results-directory TestResults
           $failedRun = $LASTEXITCODE
+          foreach ($r in ([xml](Get-Content TestResults/install.trx)).TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' }) {
+            $stack = (("$($r.Output.ErrorInfo.StackTrace)" -split "`n") | Select-Object -First 4) -join "`n"
+            $msg = "$($r.Output.ErrorInfo.Message)`n$stack" -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'
+            Write-Output "::error title=$($r.testName)::$msg"
+          }
           $counters = ([xml](Get-Content TestResults/install.trx)).TestRun.ResultSummary.Counters
           Write-Output "::notice title=ARM64 install-and-type test::passed=$($counters.passed) failed=$($counters.failed) skipped=$($counters.notExecuted)"
           if ($failedRun -ne 0 -or [int]$counters.passed -lt 3) { exit 1 }
