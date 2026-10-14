@@ -89,16 +89,17 @@ More in [docs/architecture.md](docs/architecture.md).
 | Area | State |
 | --- | --- |
 | Layout model, `.keyservant`, `.klc` import/export, validator | Implemented, unit-tested |
-| DLL writer and reader (x64, WOW64) | Implemented; tables verified against clang-cl/lld-link builds |
-| CLI | Implemented; Windows commands not yet run on a real PC |
-| Install / uninstall / repair | Implemented; untested on Windows (CI install test is the first check) |
-| Windows app | First version; not yet built or run |
-| Standalone installer | Implemented; untested on Windows |
+| DLL writer and reader (x64, WOW64) | Implemented; tables verified against clang-cl/lld-link builds; both DLLs load and relocate correctly |
+| Install / uninstall on Windows | Verified in CI: a generated layout is installed, loaded with `LoadKeyboardLayout`, every key, shift state, Caps Lock and dead-key sequence is checked with `ToUnicodeEx`, then it is uninstalled |
+| CLI | Implemented; cross-platform commands tested, Windows commands used by the install test |
+| Windows app | First version; builds in CI, not yet tried by people |
+| Standalone installer | Builds in CI (NativeAOT); not yet run on a PC |
+| Repair after feature updates | Implemented; untested |
 | macOS `.keylayout`, Linux XKB | Planned (milestone M5) |
 | ARM64 | Planned |
 
-The first milestone is to confirm on Windows that a generated DLL installs and types correctly in
-Notepad and in a 32-bit app. If you try it, please report what happened in an issue.
+Not yet checked by hand: typing in real apps (Notepad, a 32-bit app), the app's UI and the installer.
+If you try them, please report what happened in an issue.
 
 ## Contributing
 
