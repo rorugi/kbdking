@@ -148,7 +148,7 @@ public partial class PresentationTests
         Assert.False(manager.Layouts.First(l => !l.IsCustom).UninstallCommand.CanExecute(null));
 
         custom.UninstallCommand.Execute(null);
-        await Task.Delay(50);
+        await WaitUntil(() => privileged.Calls.Count > 0);
         Assert.Contains("uninstall A0000C07", privileged.Calls);
     }
 

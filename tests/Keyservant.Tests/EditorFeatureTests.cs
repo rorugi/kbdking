@@ -12,6 +12,12 @@ public partial class PresentationTests
 {
     private static EditorViewModel NewEditor() => new(new FakeDialogs(), new FakePrivileged());
 
+    /// <summary>Commands run asynchronously; wait for their effect instead of a fixed delay.</summary>
+    private static async Task WaitUntil(Func<bool> condition)
+    {
+        for (var i = 0; i < 200 && !condition(); i++) await Task.Delay(25);
+    }
+
     private static KeyCapViewModel Key(EditorViewModel editor, byte vk) => editor.KeyboardRows.SelectMany(r => r.Keys).First(k => k.VirtualKey == vk);
 
     [Fact]
@@ -250,7 +256,7 @@ public partial class PresentationTests
             dialogs.NextFile = file;
             editor.TestMinutesValue = 15;
             editor.TestInstallCommand.Execute(null);
-            await Task.Delay(100);
+            await WaitUntil(() => privileged.Calls.Count > 0);
             Assert.Contains($"temporary 15 {file}", privileged.Calls);
         }
         finally
@@ -272,7 +278,7 @@ public partial class PresentationTests
         Assert.Contains("removed automatically", item.TemporaryText);
         Assert.False(manager.Layouts.First(l => l.Klid == "A0000C07").KeepCommand.CanExecute(null));
         item.KeepCommand.Execute(null);
-        await Task.Delay(50);
+        await WaitUntil(() => privileged.Calls.Count > 0);
         Assert.Contains("keep A0010407", privileged.Calls);
     }
 }
