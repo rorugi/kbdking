@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Keyservant.App/Keyservant.App.csproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/Keyservant.Binary/Keyservant.Binary.csproj" />
+    <Project Path="src/Keyservant.Cli/Keyservant.Cli.csproj" />
+    <Project Path="src/Keyservant.Core/Keyservant.Core.csproj" />
+    <Project Path="src/Keyservant.Platform/Keyservant.Platform.csproj" />
+    <Project Path="src/Keyservant.Presentation/Keyservant.Presentation.csproj" />
+    <Project Path="src/Keyservant.Stub/Keyservant.Stub.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Keyservant.Tests/Keyservant.Tests.csproj" />
+  </Folder>
+</Solution>

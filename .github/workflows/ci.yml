@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  linux:
+    name: Engine and tests (Linux, clang oracle)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install clang-cl and lld-link (reference compiler for the PE writer)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld
+          ls -d /usr/lib/llvm-*/bin | sort -V | tail -1 >> "$GITHUB_PATH"
+
+      - name: Test
+        run: dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release --logger "console;verbosity=normal"
+
+      - name: Validate and build the samples
+        run: |
+          for f in samples/*.keyservant; do
+            name=$(basename "$f" .keyservant)
+            dotnet run --project src/Keyservant.Cli -c Release -- validate "$f"
+            dotnet run --project src/Keyservant.Cli -c Release -- build "$f" -o "out/$name"
+          done
+
+      - name: Upload sample DLLs (for manual testing on Windows)
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample-layout-dlls
+          path: out/
+
+  windows:
+    name: Windows (tests, install-and-type test, CLI, installer stub)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test
+        run: dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release
+
+      # Installs a generated layout on the runner, types with it through ToUnicodeEx and uninstalls it.
+      - name: Install-and-type test
+        env:
+          KEYSERVANT_INSTALL_TESTS: "1"
+        run: dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~WindowsInstallTests" --logger "console;verbosity=normal"
+
+      - name: Publish CLI
+        run: dotnet publish src/Keyservant.Cli/Keyservant.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o artifacts/cli
+
+      - name: Publish installer stub (NativeAOT)
+        run: dotnet publish src/Keyservant.Stub/Keyservant.Stub.csproj -c Release -r win-x64 -o artifacts/stub
+
+      - name: Create the sample's standalone installer
+        run: artifacts/cli/keyservant.exe package samples/german-austria-iast.keyservant -o artifacts/german-austria-iast-setup.exe --stub artifacts/stub/Keyservant.Stub.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-cli-and-installer
+          path: |
+            artifacts/cli/keyservant.exe
+            artifacts/german-austria-iast-setup.exe
+
+  app:
+    name: App (WinUI 3)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build src/Keyservant.App/Keyservant.App.csproj -c Release -p:Platform=x64

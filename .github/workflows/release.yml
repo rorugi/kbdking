@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart("v")
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        run: dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          dotnet publish src/Keyservant.App/Keyservant.App.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained -p:Version=$v -o dist/Keyservant
+          dotnet publish src/Keyservant.Cli/Keyservant.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:Version=$v -o dist/Keyservant
+          dotnet publish src/Keyservant.Stub/Keyservant.Stub.csproj -c Release -r win-x64 -p:Version=$v -o dist/Keyservant
+
+      # Code signing through SignPath Foundation (free for open source). Runs once the project is approved
+      # and the repository variables/secrets below are set. See CODE_SIGNING_POLICY.md.
+      - name: Upload unsigned build for signing
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned
+          path: dist/Keyservant
+
+      - name: Sign with SignPath
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: keyservant
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist/Keyservant
+
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path dist/Keyservant/* -DestinationPath "Keyservant-${{ steps.version.outputs.version }}-win-x64.zip"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" "Keyservant-${{ steps.version.outputs.version }}-win-x64.zip" --title "Keyservant ${{ steps.version.outputs.version }}" --generate-notes

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Keyservant.Binary</RootNamespace>
+    <Description>Reads and writes Windows keyboard layout DLLs (KBDTABLES) directly as PE files, without a C compiler. Cross-platform.</Description>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Keyservant.Core\Keyservant.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Keyservant.Tests" />
+  </ItemGroup>
+
+</Project>

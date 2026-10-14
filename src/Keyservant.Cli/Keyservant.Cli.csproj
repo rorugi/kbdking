@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Keyservant.Cli</RootNamespace>
+    <AssemblyName>keyservant</AssemblyName>
+    <Description>Command-line interface: create, convert, validate, build, package, install and manage keyboard layouts.</Description>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Keyservant.Platform\Keyservant.Platform.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Keyservant.Tests" />
+  </ItemGroup>
+
+</Project>

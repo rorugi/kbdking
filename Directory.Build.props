@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+
+    <Product>Keyservant</Product>
+    <Company>Keyservant contributors</Company>
+    <Copyright>Copyright (c) 2026 Keyservant contributors</Copyright>
+    <Version>0.1.0</Version>
+    <RepositoryUrl>https://github.com/rorugi/keyservant</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+</Project>

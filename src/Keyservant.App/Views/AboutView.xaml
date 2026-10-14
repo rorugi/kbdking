@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Keyservant.App.Views.AboutView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Padding="32,24" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
+        <TextBlock Text="Keyservant" Style="{StaticResource TitleTextBlockStyle}" />
+        <TextBlock x:Name="VersionText" Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        <TextBlock TextWrapping="Wrap" Style="{StaticResource BodyTextBlockStyle}"
+                   Text="Create, edit and install Windows keyboard layouts. Keyservant writes real Windows layout DLLs, so your layouts work in every app without anything running in the background." />
+        <TextBlock TextWrapping="Wrap" Style="{StaticResource BodyTextBlockStyle}"
+                   Text="Open source under the MIT licence. Free code signing provided by SignPath.io, certificate by SignPath Foundation." />
+        <HyperlinkButton Content="github.com/rorugi/keyservant" NavigateUri="https://github.com/rorugi/keyservant" />
+    </StackPanel>
+</UserControl>
