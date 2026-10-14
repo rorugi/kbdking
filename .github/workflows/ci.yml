@@ -64,7 +64,15 @@ jobs:
       - name: Install-and-type test
         env:
           KEYSERVANT_INSTALL_TESTS: "1"
-        run: dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~WindowsInstallTests" --logger "console;verbosity=normal"
+        shell: pwsh
+        run: |
+          dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release --no-build `
+            --filter "FullyQualifiedName~WindowsInstallTests" --logger "trx;LogFileName=install.trx" --results-directory TestResults
+          $failedRun = $LASTEXITCODE
+          $counters = ([xml](Get-Content TestResults/install.trx)).TestRun.ResultSummary.Counters
+          Write-Output "::notice title=Install-and-type test::passed=$($counters.passed) failed=$($counters.failed) skipped=$($counters.notExecuted)"
+          # The test must actually run here; a skip would hide a broken setup.
+          if ($failedRun -ne 0 -or [int]$counters.passed -lt 1) { exit 1 }
 
       - name: Publish CLI
         run: dotnet publish src/Keyservant.Cli/Keyservant.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o artifacts/cli
