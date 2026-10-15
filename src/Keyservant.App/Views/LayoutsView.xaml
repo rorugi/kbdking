@@ -4,7 +4,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:vm="using:Keyservant.Presentation"
-    xmlns:local="using:Keyservant.App">
+    xmlns:local="using:Keyservant.App"
+    xmlns:views="using:Keyservant.App.Views">
 
     <Grid Padding="32,24" RowSpacing="16">
         <Grid.RowDefinitions>
@@ -15,7 +16,10 @@
         </Grid.RowDefinitions>
 
         <StackPanel Spacing="4">
-            <TextBlock Text="Keyboard layouts" Style="{StaticResource TitleTextBlockStyle}" />
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="Keyboard layouts" Style="{StaticResource TitleTextBlockStyle}" />
+                <views:InfoButton Topic="layouts-page" />
+            </StackPanel>
             <TextBlock
                 Style="{StaticResource BodyTextBlockStyle}"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -42,6 +46,7 @@
                 </Button>
                 <Button Content="Install from file…" Command="{x:Bind ViewModel.InstallFromFileCommand}" Style="{StaticResource AccentButtonStyle}" />
                 <Button Content="Repair" Command="{x:Bind ViewModel.RepairCommand}" ToolTipService.ToolTip="Restore custom layouts that a Windows update removed" />
+                <views:InfoButton Topic="layouts-repair" />
             </StackPanel>
         </Grid>
 

@@ -7,7 +7,8 @@
     xmlns:val="using:Keyservant.Core.Validation"
     xmlns:uni="using:Keyservant.Core.Unicode"
     xmlns:diff="using:Keyservant.Core.Diff"
-    xmlns:local="using:Keyservant.App">
+    xmlns:local="using:Keyservant.App"
+    xmlns:views="using:Keyservant.App.Views">
 
     <UserControl.Resources>
         <!-- Used by the Unicode picker flyout, which is built in code-behind. -->
@@ -91,9 +92,32 @@
             </CommandBar>
         </Grid>
 
-        <Pivot Grid.Row="1">
-            <!-- Keys -->
-            <PivotItem Header="Keys">
+        <Grid Grid.Row="1" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid ColumnSpacing="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+            <SelectorBar x:Name="EditorTabs" SelectionChanged="EditorTabs_SelectionChanged">
+                <SelectorBarItem Text="Keys" Tag="tab-keys" IsSelected="True" />
+                <SelectorBarItem Text="Dead keys" Tag="tab-deadkeys" />
+                <SelectorBarItem Text="Compose" Tag="tab-compose" />
+                <SelectorBarItem Text="Assistant" Tag="tab-assistant" />
+                <SelectorBarItem Text="Analysis" Tag="tab-analysis" />
+                <SelectorBarItem Text="Tests" Tag="tab-tests" />
+                <SelectorBarItem Text="Compare" Tag="tab-compare" />
+                <SelectorBarItem Text="Advanced" Tag="advanced" />
+                <SelectorBarItem Text="Layout" Tag="tab-layout" />
+                <SelectorBarItem Text="Problems" Tag="tab-problems" />
+            </SelectorBar>
+                <views:InfoButton x:Name="TabInfo" Grid.Column="1" HorizontalAlignment="Left" Topic="tab-keys" ToolTipService.ToolTip="About this tab" />
+            </Grid>
+            <Grid x:Name="EditorPages" Grid.Row="1">
+            <Grid>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="16" Padding="0,8,0,24">
                         <StackPanel Orientation="Horizontal" Spacing="16">
@@ -103,12 +127,14 @@
                                 DisplayMemberPath="Label"
                                 ItemsSource="{x:Bind ViewModel.ShiftStates}"
                                 SelectedItem="{Binding SelectedState, Mode=TwoWay}" />
+                            <views:InfoButton VerticalAlignment="Bottom" Topic="shift-state" />
                             <ComboBox
                                 Header="Keyboard"
                                 MinWidth="200"
                                 DisplayMemberPath="Label"
                                 ItemsSource="{x:Bind ViewModel.Shapes}"
                                 SelectedItem="{Binding SelectedShape, Mode=TwoWay}" />
+                            <views:InfoButton VerticalAlignment="Bottom" Topic="keyboard-shape" />
                         </StackPanel>
 
                         <ItemsControl ItemsSource="{x:Bind ViewModel.KeyboardRows}">
@@ -169,10 +195,17 @@
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Text="{x:Bind ViewModel.KeyEditor.Details, Mode=OneWay}" />
-                            <TextBlock
-                                Style="{StaticResource CaptionTextBlockStyle}"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="Type characters, or codes like U+0101. Leave empty for nothing. A dead key waits for the next keystroke (see the Dead keys tab)." />
+                            <Grid ColumnSpacing="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="Type characters, or codes like U+0101. Leave empty for nothing. A dead key waits for the next keystroke (see the Dead keys tab)." />
+                                <views:InfoButton Grid.Column="1" VerticalAlignment="Bottom" Topic="key-editor" />
+                            </Grid>
                             <ItemsControl ItemsSource="{x:Bind ViewModel.KeyEditor.Rows, Mode=OneWay}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:OutputRowViewModel">
@@ -224,14 +257,15 @@
                                 LostFocus="Preview_LostFocus"
                                 Text="{x:Bind ViewModel.PreviewText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
-                            <Button Content="Clear" Command="{x:Bind ViewModel.ClearPreviewCommand}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Clear" Command="{x:Bind ViewModel.ClearPreviewCommand}" />
+                                <views:InfoButton Topic="preview" />
+                            </StackPanel>
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
-            </PivotItem>
-
-            <!-- Dead keys -->
-            <PivotItem Header="Dead keys">
+            </Grid>
+            <Grid Visibility="Collapsed">
                 <Grid ColumnSpacing="24" Padding="0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="300" />
@@ -316,10 +350,8 @@
                         <Button Grid.Row="3" Content="Add composition" Command="{x:Bind ViewModel.DeadKeys.Selected.AddEntryCommand, Mode=OneWay}" />
                     </Grid>
                 </Grid>
-            </PivotItem>
-
-            <!-- Compose -->
-            <PivotItem Header="Compose">
+            </Grid>
+            <Grid Visibility="Collapsed">
                 <Grid RowSpacing="12" Padding="0,8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -340,7 +372,9 @@
                                 IsEnabled="{x:Bind ViewModel.Compose.IsEnabled, Mode=OneWay}"
                                 ItemsSource="{x:Bind ViewModel.Compose.KeyOptions}"
                                 SelectedItem="{Binding Compose.SelectedKey, Mode=TwoWay}" />
+                            <views:InfoButton VerticalAlignment="Bottom" Topic="compose-key" />
                             <TextBox Header="Shown while waiting" Width="140" IsEnabled="{x:Bind ViewModel.Compose.IsEnabled, Mode=OneWay}" Text="{x:Bind ViewModel.Compose.Accent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <views:InfoButton VerticalAlignment="Bottom" Topic="compose-accent" />
                         </StackPanel>
                         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Compose.Summary, Mode=OneWay}" TextWrapping="Wrap" />
                     </StackPanel>
@@ -382,10 +416,8 @@
                         </ListView>
                     </Grid>
                 </Grid>
-            </PivotItem>
-
-            <!-- Placement assistant -->
-            <PivotItem Header="Assistant">
+            </Grid>
+            <Grid Visibility="Collapsed">
                 <Grid ColumnSpacing="24" Padding="0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="420" />
@@ -410,12 +442,19 @@
                                 MinHeight="96"
                                 MaxHeight="240"
                                 Text="{x:Bind ViewModel.Assistant.SampleText, Mode=TwoWay}" />
-                            <NumberBox
-                                Header="Characters needed for an own dead key"
-                                Minimum="1"
-                                Maximum="50"
-                                SpinButtonPlacementMode="Inline"
-                                Value="{x:Bind ViewModel.Assistant.DeadKeyThresholdValue, Mode=TwoWay}" />
+                            <Grid ColumnSpacing="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+    <NumberBox
+                                    Header="Characters needed for an own dead key"
+                                    Minimum="1"
+                                    Maximum="50"
+                                    SpinButtonPlacementMode="Inline"
+                                    Value="{x:Bind ViewModel.Assistant.DeadKeyThresholdValue, Mode=TwoWay}" />
+                                <views:InfoButton Grid.Column="1" VerticalAlignment="Bottom" Topic="assistant-threshold" />
+                            </Grid>
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Button Content="Suggest" Style="{StaticResource AccentButtonStyle}" Command="{x:Bind ViewModel.Assistant.SuggestCommand}" />
                                 <Button Content="Apply selected" Command="{x:Bind ViewModel.Assistant.ApplyCommand}" />
@@ -461,10 +500,8 @@
                         </ItemsControl>
                     </Grid>
                 </Grid>
-            </PivotItem>
-
-            <!-- Text analysis -->
-            <PivotItem Header="Analysis">
+            </Grid>
+            <Grid Visibility="Collapsed">
                 <ScrollViewer>
                     <StackPanel Spacing="12" Padding="0,8,0,24">
                         <TextBlock
@@ -478,6 +515,7 @@
                             <Button Content="Compare with another layout…" Command="{x:Bind ViewModel.Analysis.CompareCommand}" />
                             <Button Content="Save heatmap…" Command="{x:Bind ViewModel.Analysis.SaveHeatmapCommand}" />
                             <Button Content="Place missing characters" Click="SendToAssistant_Click" ToolTipService.ToolTip="Opens the assistant with the untypeable characters" />
+                            <views:InfoButton Topic="analysis-effort" />
                         </StackPanel>
                         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Analysis.Summary, Mode=OneWay}" TextWrapping="Wrap" />
                         <TextBlock Text="{x:Bind ViewModel.Analysis.Comparison, Mode=OneWay}" TextWrapping="Wrap" Visibility="{x:Bind local:Converters.VisibleIfText(ViewModel.Analysis.Comparison), Mode=OneWay}" />
@@ -530,10 +568,8 @@
                         </Grid>
                     </StackPanel>
                 </ScrollViewer>
-            </PivotItem>
-
-            <!-- Tests -->
-            <PivotItem Header="Tests">
+            </Grid>
+            <Grid Visibility="Collapsed">
                 <Grid RowSpacing="8" Padding="0,8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -568,10 +604,8 @@
                         </ListView.ItemTemplate>
                     </ListView>
                 </Grid>
-            </PivotItem>
-
-            <!-- Compare -->
-            <PivotItem Header="Compare">
+            </Grid>
+            <Grid Visibility="Collapsed">
                 <Grid RowSpacing="8" Padding="0,8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -608,12 +642,27 @@
                         </ListView.ItemTemplate>
                     </ListView>
                 </Grid>
-            </PivotItem>
-
-            <!-- Advanced: shift states, scan codes, key names, ligatures -->
-            <PivotItem Header="Advanced">
-                <Pivot>
-                    <PivotItem Header="Shift states">
+            </Grid>
+            <Grid Visibility="Collapsed">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                    <SelectorBar x:Name="AdvancedTabs" SelectionChanged="AdvancedTabs_SelectionChanged">
+                        <SelectorBarItem Text="Shift states" Tag="tab-shiftstates" IsSelected="True" />
+                        <SelectorBarItem Text="Scan codes" Tag="tab-scancodes" />
+                        <SelectorBarItem Text="Key names" Tag="tab-keynames" />
+                        <SelectorBarItem Text="Ligatures" Tag="tab-ligatures" />
+                    </SelectorBar>
+                    </Grid>
+                    <Grid x:Name="AdvancedPages" Grid.Row="1">
+                    <Grid>
                         <Grid RowSpacing="12" Padding="0,8">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -696,9 +745,8 @@
                                 <TextBlock Text="{x:Bind ViewModel.ShiftStateEditor.Message, Mode=OneWay}" TextWrapping="Wrap" />
                             </StackPanel>
                         </Grid>
-                    </PivotItem>
-
-                    <PivotItem Header="Scan codes">
+                    </Grid>
+                    <Grid Visibility="Collapsed">
                         <Grid RowSpacing="12" Padding="0,8">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -731,9 +779,8 @@
                                 </ListView.ItemTemplate>
                             </ListView>
                         </Grid>
-                    </PivotItem>
-
-                    <PivotItem Header="Key names">
+                    </Grid>
+                    <Grid Visibility="Collapsed">
                         <Grid RowSpacing="12" Padding="0,8">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -772,9 +819,8 @@
                                 </ListView.ItemTemplate>
                             </ListView>
                         </Grid>
-                    </PivotItem>
-
-                    <PivotItem Header="Ligatures">
+                    </Grid>
+                    <Grid Visibility="Collapsed">
                         <Grid RowSpacing="12" Padding="0,8">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -811,43 +857,78 @@
                                 </ListView.ItemTemplate>
                             </ListView>
                         </Grid>
-                    </PivotItem>
-                </Pivot>
-            </PivotItem>
-
-            <!-- Layout metadata -->
-            <PivotItem Header="Layout">
+                    </Grid>
+                    </Grid>
+                </Grid>
+            </Grid>
+            <Grid Visibility="Collapsed">
                 <ScrollViewer>
                     <StackPanel MaxWidth="560" HorizontalAlignment="Left" Padding="0,8,0,24" Spacing="12">
                         <TextBox Header="Name" Text="{x:Bind ViewModel.LayoutName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBox Header="DLL name (1–8 letters or digits, e.g. kbdiast)" Text="{x:Bind ViewModel.DllName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBox Header="Language (e.g. de-AT)" Text="{x:Bind ViewModel.Locale, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBox Header="Version" Text="{x:Bind ViewModel.LayoutVersion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid ColumnSpacing="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+    <TextBox Header="DLL name (1–8 letters or digits, e.g. kbdiast)" Text="{x:Bind ViewModel.DllName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <views:InfoButton Grid.Column="1" VerticalAlignment="Bottom" Topic="dll-name" />
+                        </Grid>
+                        <Grid ColumnSpacing="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+    <TextBox Header="Language (e.g. de-AT)" Text="{x:Bind ViewModel.Locale, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <views:InfoButton Grid.Column="1" VerticalAlignment="Bottom" Topic="language" />
+                        </Grid>
+                        <Grid ColumnSpacing="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+    <TextBox Header="Version" Text="{x:Bind ViewModel.LayoutVersion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <views:InfoButton Grid.Column="1" VerticalAlignment="Bottom" Topic="layout-version" />
+                        </Grid>
                         <TextBox Header="Author" Text="{x:Bind ViewModel.Author, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBox Header="Description" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" Text="{x:Bind ViewModel.Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <CheckBox Content="Right Alt acts as AltGr" IsChecked="{x:Bind ViewModel.AltGrFlag, Mode=TwoWay}" />
-                        <ComboBox
-                            Header="Shortcuts (Ctrl+C, Ctrl+V, Ctrl+Z …)"
-                            HorizontalAlignment="Stretch"
-                            DisplayMemberPath="Label"
-                            ItemsSource="{x:Bind ViewModel.ShortcutModes}"
-                            PlaceholderText="Mixed"
-                            SelectedItem="{Binding SelectedShortcutMode, Mode=TwoWay}" />
+                        <Grid ColumnSpacing="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+    <CheckBox Content="Right Alt acts as AltGr" IsChecked="{x:Bind ViewModel.AltGrFlag, Mode=TwoWay}" />
+                            <views:InfoButton Grid.Column="1" Topic="altgr" />
+                        </Grid>
+                        <Grid ColumnSpacing="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+    <ComboBox
+                                Header="Shortcuts (Ctrl+C, Ctrl+V, Ctrl+Z …)"
+                                HorizontalAlignment="Stretch"
+                                DisplayMemberPath="Label"
+                                ItemsSource="{x:Bind ViewModel.ShortcutModes}"
+                                PlaceholderText="Mixed"
+                                SelectedItem="{Binding SelectedShortcutMode, Mode=TwoWay}" />
+                            <views:InfoButton Grid.Column="1" VerticalAlignment="Bottom" Topic="shortcuts" />
+                        </Grid>
                         <TextBlock
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             TextWrapping="Wrap"
                             Text="{x:Bind ViewModel.ShortcutSummary, Mode=OneWay}" />
-                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                            <Run Text="Layout ID: " />
-                            <Run Text="{x:Bind ViewModel.LayoutId, Mode=OneWay, TargetNullValue='assigned on first install'}" />
-                        </TextBlock>
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                <Run Text="Layout ID: " />
+                                <Run Text="{x:Bind ViewModel.LayoutId, Mode=OneWay, TargetNullValue='assigned on first install'}" />
+                            </TextBlock>
+                            <views:InfoButton Topic="layout-id" />
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
-            </PivotItem>
-
-            <!-- Problems -->
-            <PivotItem Header="Problems">
+            </Grid>
+            <Grid Visibility="Collapsed">
                 <Grid RowSpacing="8" Padding="0,8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -875,8 +956,9 @@
                         </ListView.ItemTemplate>
                     </ListView>
                 </Grid>
-            </PivotItem>
-        </Pivot>
+            </Grid>
+            </Grid>
+        </Grid>
 
         <TextBlock
             Grid.Row="2"

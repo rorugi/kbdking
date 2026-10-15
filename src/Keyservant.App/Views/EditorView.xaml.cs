@@ -79,6 +79,28 @@ public sealed partial class EditorView : UserControl
     /// <summary>Key-up events go elsewhere once the preview loses focus, so forget held layer keys.</summary>
     private void Preview_LostFocus(object sender, RoutedEventArgs e) => ViewModel.ResetPreviewKeys();
 
+    // ---------------------------------------------------------------- tabs
+
+    private void EditorTabs_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args) => ShowSelectedPages();
+
+    private void AdvancedTabs_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args) => ShowSelectedPages();
+
+    /// <summary>Shows the page of the selected tab (the tab bar stays fixed) and points the ⓘ button at it.</summary>
+    private void ShowSelectedPages()
+    {
+        static void Show(SelectorBar? bar, Grid? pages)
+        {
+            if (bar is null || pages is null) return; // during XAML loading
+            var index = bar.SelectedItem is { } item ? bar.Items.IndexOf(item) : 0;
+            for (var i = 0; i < pages.Children.Count; i++) pages.Children[i].Visibility = i == index ? Visibility.Visible : Visibility.Collapsed;
+        }
+        Show(EditorTabs, EditorPages);
+        Show(AdvancedTabs, AdvancedPages);
+        if (TabInfo is null) return;
+        var topic = EditorTabs?.SelectedItem?.Tag as string ?? "tab-keys";
+        TabInfo.Topic = topic == "advanced" ? AdvancedTabs?.SelectedItem?.Tag as string ?? "tab-shiftstates" : topic;
+    }
+
     // ---------------------------------------------------------------- Unicode picker
 
     /// <summary>Opens the character search next to a field; the picked character goes into that field.</summary>
