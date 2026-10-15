@@ -84,7 +84,11 @@ public sealed class OutputRowViewModel : ObservableObject, ICharacterTarget
         }
         if (_isDead && parsed.Length != 1)
         {
-            Error = parsed.Length == 0 ? "A dead key needs an accent character." : "A dead key must be a single character.";
+            Error = parsed.Length == 0 ? "A dead key needs an accent character."
+                : parsed.Skip(1).All(IsCombiningMark)
+                    ? "A dead key is a single accent character, and Windows dead keys can only produce single characters. " +
+                      "For a letter like r̥, put the combining mark ◌̥ on a key (untick Dead key; type it after the letter) or r̥ itself on a key."
+                    : "A dead key must be a single character.";
             return;
         }
         Error = null;
@@ -134,8 +138,16 @@ public sealed class OutputRowViewModel : ObservableObject, ICharacterTarget
             i++;
         }
         result = sb.ToString();
+        // "◌̥" as shown on key caps and in the character search: the dotted circle only marks where the
+        // combining mark goes, so the text is the mark alone.
+        if (result.Length > 1 && result[0] == DottedCircle && result.Skip(1).All(IsCombiningMark)) result = result[1..];
         return true;
     }
+
+    private const char DottedCircle = '\u25CC';
+
+    private static bool IsCombiningMark(char c) =>
+        CharUnicodeInfo.GetUnicodeCategory(c) is UnicodeCategory.NonSpacingMark or UnicodeCategory.EnclosingMark or UnicodeCategory.SpacingCombiningMark;
 
     private static IEnumerable<Rune> EnumerateRunes(string s)
     {

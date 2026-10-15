@@ -96,3 +96,27 @@ public partial class PresentationTests
         foreach (var g in CombiningMarkTests.Graphemes(preset)) Assert.True(finder.CanType(g), g);
     }
 }
+
+public partial class PresentationTests
+{
+    [Fact]
+    public void A_combining_mark_shown_on_a_dotted_circle_is_taken_as_the_mark_alone()
+    {
+        Assert.True(OutputRowViewModel.TryParse("◌̥", out var mark));
+        Assert.Equal("̥", mark);
+        Assert.True(OutputRowViewModel.TryParse("◌", out var circle));
+        Assert.Equal("◌", circle);
+
+        var editor = NewEditor();
+        Key(editor, (byte)'0').SelectCommand.Execute(null);
+        var row = editor.KeyEditor!.Rows.First(r => r.State == ShiftState.AltGr);
+        row.Text = "◌̥";
+        row.IsDead = true;
+        Assert.Null(row.Error);
+        Assert.Equal('̥', editor.Layout.FindKey((byte)'0')![ShiftState.AltGr]!.Accent);
+        Assert.NotNull(editor.Layout.FindDeadKey('̥'));
+
+        row.Text = "r̥";
+        Assert.Contains("combining mark", row.Error, StringComparison.Ordinal);
+    }
+}
