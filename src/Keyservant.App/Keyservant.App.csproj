@@ -15,6 +15,9 @@
     <UseWinUI>true</UseWinUI>
     <!-- Unpackaged app: no MSIX needed to run it; the Windows App SDK ships inside the app folder. -->
     <WindowsPackageType>None</WindowsPackageType>
+    <!-- Generates the resource index (.pri) that WinUI needs to find its styles and the compiled XAML,
+         also for this unpackaged app; without it the app fails at startup with "XAML parsing failed". -->
+    <EnableMsixTooling>true</EnableMsixTooling>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <!-- XAML compiler warnings are not under our control; keep them visible but non-fatal. -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>

@@ -11,7 +11,7 @@ public sealed partial class MainWindow : Window
 {
     private readonly LayoutsView _layoutsView;
     private readonly EditorView _editorView;
-    private readonly AboutView _aboutView = new();
+    private readonly AboutView _aboutView;
     private readonly DialogService _dialogs;
     private readonly EditorViewModel _editor;
     private bool _closeConfirmed;
@@ -31,6 +31,7 @@ public sealed partial class MainWindow : Window
         });
         AppWindow.Closing += OnClosing;
 
+        _aboutView = new AboutView();
         _layoutsView = new LayoutsView(manager);
         _editorView = new EditorView(editor);
         Nav.SelectedItem = LayoutsItem;

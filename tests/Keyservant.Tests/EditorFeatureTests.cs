@@ -256,7 +256,8 @@ public partial class PresentationTests
             dialogs.NextFile = file;
             editor.TestMinutesValue = 15;
             editor.TestInstallCommand.Execute(null);
-            await WaitUntil(() => editor.Status == "ok"); // the command has finished reading the saved file
+            // Wait until the command has finished (it reads the saved file back after installing).
+            await WaitUntil(() => privileged.Calls.Count > 0 && editor.TestInstallCommand.CanExecute(null));
             Assert.Contains($"temporary 15 {file}", privileged.Calls);
         }
         finally

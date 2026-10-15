@@ -192,7 +192,8 @@ jobs:
             $details = if (Test-Path $log) { Get-Content $log -Raw } else { '' }
             $events = Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue |
               Where-Object { $_.ProviderName -in '.NET Runtime','Application Error' } | Select-Object -First 2 | ForEach-Object { $_.Message }
-            $text = ("exit code: $(if ($p.HasExited) { $p.ExitCode } else { 'running' })`n$details`n$($events -join "`n")") -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'
+            $pri = (Get-ChildItem app-out -Filter *.pri | ForEach-Object Name) -join ', '
+            $text = ("exit code: $(if ($p.HasExited) { $p.ExitCode } else { 'running' }); resource files: $pri`n$details`n$($events -join "`n")") -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'
             Write-Output "::error title=App start::$text"
             if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
             exit 1
