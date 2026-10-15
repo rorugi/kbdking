@@ -45,7 +45,7 @@ public class ShortcutTests
         Assert.Equal(new[] { ShortcutMode.Qwerty }, ShortcutPositions.Detect(layout));
         // Ctrl+key types the control character of the new virtual key (Ctrl+C = U+0003 in consoles).
         Assert.Equal("\u0005", layout.FindKey((byte)'E')![ShiftState.Ctrl]!.Text);
-        Assert.Empty(LayoutValidator.Validate(layout).Issues.Where(i => i.Severity == Severity.Error));
+        Assert.DoesNotContain(LayoutValidator.Validate(layout).Issues, i => i.Severity == Severity.Error);
 
         // And back: shortcuts follow the letters again, with the original virtual keys.
         ShortcutPositions.Apply(layout, ShortcutMode.FollowLetters);
