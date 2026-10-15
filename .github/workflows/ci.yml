@@ -174,3 +174,28 @@ jobs:
 
       - name: Build (ARM64)
         run: dotnet build src/Keyservant.App/Keyservant.App.csproj -c Release -p:Platform=ARM64
+
+      # Publishes the app the way users do and starts it: it must still be running after 20 seconds.
+      - name: Publish and start the app
+        shell: pwsh
+        env:
+          KEYSERVANT_NO_DIALOGS: "1"
+        run: |
+          dotnet publish src/Keyservant.App/Keyservant.App.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained -o app-out
+          dotnet publish src/Keyservant.Cli/Keyservant.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o app-out
+          Get-ChildItem app-out -Filter *.pri | ForEach-Object { Write-Output "resources: $($_.Name)" }
+          $p = Start-Process -FilePath app-out/Keyservant.App.exe -PassThru
+          Start-Sleep -Seconds 20
+          $p.Refresh()
+          $log = Join-Path $env:LOCALAPPDATA 'Keyservant\crash.log'
+          if ($p.HasExited -or (Test-Path $log)) {
+            $details = if (Test-Path $log) { Get-Content $log -Raw } else { '' }
+            $events = Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue |
+              Where-Object { $_.ProviderName -in '.NET Runtime','Application Error' } | Select-Object -First 2 | ForEach-Object { $_.Message }
+            $text = ("exit code: $(if ($p.HasExited) { $p.ExitCode } else { 'running' })`n$details`n$($events -join "`n")") -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'
+            Write-Output "::error title=App start::$text"
+            if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+            exit 1
+          }
+          Write-Output "::notice title=App start::The app was still running after 20 seconds."
+          Stop-Process -Id $p.Id -Force

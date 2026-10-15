@@ -38,7 +38,11 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>Shows an unexpected error instead of crashing.</summary>
-    internal void ShowError(Exception ex) => _ = _dialogs.ShowMessageAsync("Something went wrong", ex.Message);
+    internal void ShowError(Exception ex)
+    {
+        App.Log(ex);
+        _ = _dialogs.ShowMessageAsync("Something went wrong", ex.Message);
+    }
 
     /// <summary>Asks before closing with unsaved changes.</summary>
     private async void OnClosing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
