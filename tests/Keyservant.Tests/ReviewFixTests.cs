@@ -149,6 +149,21 @@ public class FeatureFixTests
     }
 
     [Fact]
+    public void Copilot_key_can_be_the_compose_key()
+    {
+        Assert.Contains(ComposeDefinition.CommonKeys, k => k.Name == "Copilot key" && k.ScanCode == 0x6E && !k.Extended);
+        var layout = WithCompose(TestLayouts.Sample("german-austria-iast"), (".r", "ṛ"));
+        layout.Compose!.ScanCode = 0x6E;
+        layout.Compose.Extended = false;
+        var compiled = ComposeCompiler.Compile(layout);
+        Assert.Empty(compiled.Errors);
+        Assert.Empty(compiled.Warnings);
+        var sim = new TypingSimulator(compiled.Layout);
+        Assert.Equal("", sim.PressScanCode(0x6E, false, ShiftState.Shift)); // the keyboard holds Shift (and Win)
+        Assert.Equal("ṛ", sim.PressScanCode(0x34, false, ShiftState.Base) + sim.PressScanCode(0x13, false, ShiftState.Base));
+    }
+
+    [Fact]
     public void Compiling_twice_changes_nothing_and_duplicates_count_once()
     {
         var layout = WithCompose(LayoutTemplates.Create("en-US"), ("--", "–"), ("--", "–"), (".r", "ṛ"));

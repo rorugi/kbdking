@@ -244,4 +244,43 @@ public partial class WindowsInstallTests
             system.Uninstall(installed.Klid);
         }
     }
+
+    /// <summary>
+    /// The Copilot key sends Left Windows + Left Shift + F23 (scan code 6E). With 6E as the compose key, the layout
+    /// turns it into the compose dead key, and Win/Shift held by the keyboard don't get in the way.
+    /// </summary>
+    [WindowsInstallFact]
+    public void Copilot_key_works_as_compose_key()
+    {
+        var layout = TestLayouts.Sample("german-austria-iast");
+        layout.Metadata.DllName = "kbdkscop";
+        layout.Metadata.Name = "Keyservant Copilot compose test";
+        layout.Compose = new ComposeDefinition { ScanCode = 0x6E, Extended = false };
+        layout.Compose.Sequences.Add(new ComposeSequence(".r", "ṛ"));
+        var system = new WindowsLayoutSystem();
+        var installed = system.Install(LayoutPackage.Create(layout, LayoutDllBuilder.Build(layout)));
+        try
+        {
+            var hkl = LoadKeyboardLayout(installed.Klid, KlfNotEllShell);
+            Assert.NotEqual(0, hkl);
+            try
+            {
+                var composeVk = (byte)MapVirtualKeyEx(0x6E, 1 /* MAPVK_VSC_TO_VK */, hkl);
+                Assert.NotEqual(0x86, composeVk); // not VK_F23 any more
+                Flush(hkl);
+                var first = Press(hkl, composeVk, ShiftState.Shift, false, heldKey: 0x5B); // Copilot: LWin + LShift held
+                Assert.Equal(-1, first.Result);                                            // a dead key
+                var text = Press(hkl, 0xBE, ShiftState.Base, false).Text + Press(hkl, (byte)'R', ShiftState.Base, false).Text;
+                Assert.Equal("ṛ", text);
+            }
+            finally
+            {
+                UnloadKeyboardLayout(hkl);
+            }
+        }
+        finally
+        {
+            system.Uninstall(installed.Klid);
+        }
+    }
 }

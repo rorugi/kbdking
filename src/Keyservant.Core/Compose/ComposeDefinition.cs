@@ -39,6 +39,9 @@ public sealed class ComposeDefinition
     [
         ("Menu key", 0x5D, true),
         ("Right Windows key", 0x5C, true),
+        // The Copilot key sends Left Windows + Left Shift + F23 (scan code 6E). As the compose key, 6E types the
+        // compose dead key instead of F23, so the Copilot shortcut (Win+Shift+F23) no longer fires.
+        ("Copilot key", 0x6E, false),
         ("Caps Lock", 0x3A, false),
         ("Right Ctrl", 0x1D, true),
         ("Scroll Lock", 0x46, false),

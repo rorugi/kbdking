@@ -125,6 +125,7 @@ internal static partial class Program
               keyservant suggest <file> --chars "āīū…"     Propose where to put characters
                          [--text <sample.txt>] [--apply] [-o <out>]
               keyservant compose import <file> <.XCompose> Add compose sequences [--key "E0 5D"]
+                                                           (keys: E0 5D Menu, E0 5C Right Win, 6E Copilot, 3A Caps Lock)
               keyservant compose export <file> <out>       Write the sequences as .XCompose
               keyservant compose list <file>               List the sequences
               keyservant analyze <file> <text.txt>         Typing effort and a heatmap for a text

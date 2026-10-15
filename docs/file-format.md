@@ -190,8 +190,9 @@ layout is built, so they work in every app without extra software.
 }
 ```
 
-- `key`: the scan code of the compose key, `E0 5D` (the Menu key) by default; `E0 38` is the right Alt,
-  `3A` Caps Lock. Keyservant gives that key a free virtual key that types a dead key.
+- `key`: the scan code of the compose key, `E0 5D` (the Menu key) by default; `E0 5C` is the right Windows
+  key, `6E` the Copilot key (it sends Win + Shift + F23; as the compose key it no longer opens Copilot),
+  `3A` Caps Lock. Right Alt (`E0 38`) only works if the layout has no AltGr characters. Keyservant gives that key a free virtual key that types a dead key.
 - `accent`: what Windows shows while it waits for the rest of the sequence (default ⎄ U+2384).
 - `sequences`: `[keys, result]`. `keys` are the characters typed after the compose key, as they are typed
   with this layout (so `"A"` means Shift+a). `result` must be a single BMP character. Intermediate steps
