@@ -29,7 +29,8 @@ public static class ComposeCompiler
     public const string CopilotWarning =
         "Windows may still open Copilot with the Copilot key, because it handles that key before keyboard layouts do. " +
         "If it does: in Settings > Bluetooth & devices > Keyboard, set the Copilot key to \"Right Ctrl\" and choose Right Ctrl " +
-        "as the compose key here (or \"Context menu\" and the Menu key). That setting comes with the Windows 11 update of October 2026.";
+        "as the compose key here (or \"Context menu\" and the Menu key). That setting arrives gradually with the Windows 11 " +
+        "update of October 2026; until your PC has it, use another compose key such as Caps Lock.";
 
     private static readonly byte[] CandidateVks = [0xDF, 0xE1, 0xE3, 0xE4, 0xE6, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0x92, 0x93, 0x94, 0x95, 0x96];
 

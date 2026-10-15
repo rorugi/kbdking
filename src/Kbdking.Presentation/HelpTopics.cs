@@ -108,7 +108,8 @@ public static class HelpTopics
             "Right Windows works too and keeps the left Windows key. Caps Lock is a popular choice if you don't need Caps Lock.\n\n" +
             "The Copilot key sends Windows + Shift + F23, and Windows may open Copilot with it before the layout sees the key. " +
             "Then set Settings > Bluetooth & devices > Keyboard > Copilot key to \"Right Ctrl\" (Windows 11 update of October 2026 or " +
-            "later) and choose Right Ctrl as the compose key; \"Context menu\" with the Menu key works the same way.\n\n" +
+            "later) and choose Right Ctrl as the compose key; \"Context menu\" with the Menu key works the same way. Windows rolls that " +
+            "setting out gradually; if your PC only offers Search, Copilot and Open an app, use another compose key for now.\n\n" +
             "The chosen key loses its old function in this layout only."),
         ["compose-accent"] = new("Shown while waiting",
             "Windows needs a character for the waiting state of a dead key. Some programs show it briefly while you type the " +
