@@ -44,6 +44,7 @@ public class LayoutDllTests
     public void Sample_layout_round_trips()
     {
         var layout = TestLayouts.Sample("german-austria-iast");
+        layout.Tests.Clear(); // tests live only in the .keyservant file, not in the DLL
         var result = LayoutDllBuilder.Build(layout);
         Assert.Equal(KeyservantFormat.Serialize(layout), Normalize(LayoutDllReader.Read(result.X64), layout.Metadata));
     }

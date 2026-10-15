@@ -154,6 +154,8 @@ public class LayoutTestTests
     public void Tests_pass_and_fail_and_block_validation()
     {
         var layout = TestLayouts.Sample("german-austria-iast");
+        Assert.All(LayoutTestRunner.Run(layout), r => Assert.True(r.Passed, r.Message)); // the sample's own tests
+        layout.Tests.Clear();
         layout.Tests.Add(new LayoutTestCase("AltGr+. t", "ṭ"));
         layout.Tests.Add(new LayoutTestCase("a", "b", "wrong on purpose"));
         layout.Tests.Add(new LayoutTestCase("Bogus+a", "a"));

@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "metadata": {
     "name": "German (Austria) + IAST",
-    "description": "Standard German (Austria) layout plus IAST transliteration for Sanskrit on AltGr. AltGr+a/i/u = ā ī ū, AltGr+s = ś, AltGr+g = ṅ, AltGr+n = ñ (Shift for capitals). AltGr+. is a dot-below dead key (ṭ ḍ ṇ ṣ ṛ ḷ ṃ ḥ), AltGr+- a macron dead key; dot below then macron (or the reverse) followed by r or l gives ṝ ḹ.",
+    "description": "Standard German (Austria) layout plus IAST transliteration for Sanskrit on AltGr. AltGr+a/i/u = ā ī ū, AltGr+s = ś, AltGr+g = ṅ, AltGr+n = ñ (Shift for capitals), AltGr+r = √ (root sign, as in √gam). AltGr+. is a dot-below dead key (ṭ ḍ ṇ ṣ ṛ ḷ ṃ ḥ), AltGr+- a macron dead key; dot below then macron (or the reverse) followed by r or l gives ṝ ḹ.",
     "author": "Keyservant contributors",
     "version": "1.0",
     "locale": "de-AT",
@@ -196,7 +196,7 @@
     {"vk": "Q", "attrs": ["capslock"], "base": "q", "shift": "Q", "altgr": "@"},
     {"vk": "W", "attrs": ["capslock"], "base": "w", "shift": "W"},
     {"vk": "E", "attrs": ["capslock"], "base": "e", "shift": "E", "altgr": "€"},
-    {"vk": "R", "attrs": ["capslock"], "base": "r", "shift": "R"},
+    {"vk": "R", "attrs": ["capslock"], "base": "r", "shift": "R", "altgr": "√"},
     {"vk": "T", "attrs": ["capslock"], "base": "t", "shift": "T"},
     {"vk": "Z", "attrs": ["capslock"], "base": "z", "shift": "Z"},
     {"vk": "U", "attrs": ["capslock"], "base": "u", "shift": "U", "altgr": "ū", "shift+altgr": "Ū"},
@@ -411,5 +411,12 @@
     "5B": "Linke Windows",
     "5C": "Rechte Windows",
     "5D": "Anwendung"
-  }
+  },
+  "tests": [
+    {"name": "long a", "keys": "AltGr+a", "expect": "ā"},
+    {"name": "capital palatal sibilant", "keys": "Shift+AltGr+s", "expect": "Ś"},
+    {"name": "dot below", "keys": "AltGr+. t", "expect": "ṭ"},
+    {"name": "long vocalic r (chained)", "keys": "AltGr+. AltGr+- r", "expect": "ṝ"},
+    {"name": "root sign", "keys": "AltGr+r", "expect": "√"}
+  ]
 }

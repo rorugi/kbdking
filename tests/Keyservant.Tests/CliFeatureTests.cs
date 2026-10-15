@@ -42,7 +42,7 @@ public sealed partial class CliTests
         File.WriteAllText(file, KeyservantFormat.Serialize(layout));
         var (code, output) = Run("test", file);
         Assert.Equal(0, code);
-        Assert.Contains("All 1 tests passed", output);
+        Assert.Contains("All 6 tests passed", output); // the sample has five of its own
 
         layout.Tests.Add(new Core.Model.LayoutTestCase("a", "b"));
         File.WriteAllText(file, KeyservantFormat.Serialize(layout));

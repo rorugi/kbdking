@@ -56,7 +56,7 @@ public sealed class AssistantViewModel : ObservableObject
     /// <summary>Character sets to start from.</summary>
     public IReadOnlyList<CharacterPreset> Presets { get; } =
     [
-        new("Sanskrit (IAST)", "āĀīĪūŪṛṚṝṜḷḶḹḸṅṄñÑṭṬḍḌṇṆśŚṣṢṃṂḥḤ"),
+        new("Sanskrit (IAST)", "āĀīĪūŪṛṚṝṜḷḶḹḸṅṄñÑṭṬḍḌṇṆśŚṣṢṃṂḥḤ√"),
         new("Pali", "āĀīĪūŪṅṄñÑṭṬḍḌṇṆḷḶṃṂ"),
         new("Hindi transliteration (ISO 15919)", "āĀīĪūŪr̥ēĒōŌṅṄñÑṭṬḍḌṇṆśŚṣṢṁṀḥḤ"),
         new("Pinyin with tones", "āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüĀÁǍÀĒÉĚÈĪÍǏÌŌÓǑÒŪÚǓÙǕǗǙǛÜ"),

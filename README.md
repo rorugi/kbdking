@@ -71,7 +71,7 @@ as a `.keyservant` file) and `repair`. Run `keyservant help` for details.
 
 The sample [`samples/german-austria-iast.keyservant`](samples/german-austria-iast.keyservant) adds IAST
 transliteration for Sanskrit to the Austrian German layout: AltGr+a/i/u → ā ī ū, AltGr+s → ś,
-AltGr+g → ṅ, AltGr+n → ñ, a dot-below dead key on AltGr+. (ṭ ḍ ṇ ṣ ṛ ḷ ṃ ḥ) and a macron dead key on
+AltGr+g → ṅ, AltGr+n → ñ, AltGr+r → √ (root sign, as in √gam), a dot-below dead key on AltGr+. (ṭ ḍ ṇ ṣ ṛ ḷ ṃ ḥ) and a macron dead key on
 AltGr+- that chain into ṝ and ḹ.
 
 ## The .keyservant format

@@ -89,5 +89,10 @@ public class ClangOracleTests
     public void Everything_layout_matches_the_compiler() => AssertSameAsCompiler(TestLayouts.Everything());
 
     [ClangFact]
-    public void Iast_sample_matches_the_compiler() => AssertSameAsCompiler(TestLayouts.Sample("german-austria-iast"));
+    public void Iast_sample_matches_the_compiler()
+    {
+        var layout = TestLayouts.Sample("german-austria-iast");
+        layout.Tests.Clear(); // tests live only in the .keyservant file, not in the DLL
+        AssertSameAsCompiler(layout);
+    }
 }
