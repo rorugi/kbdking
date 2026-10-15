@@ -52,6 +52,44 @@ public sealed partial class EditorView : UserControl
         viewModel.Analysis.PropertyChanged += OnToolPropertyChanged;
         viewModel.Compare.PropertyChanged += OnToolPropertyChanged;
         viewModel.TabRequested += (_, topic) => SelectTab(topic);
+
+        // Auto shift state: follow the modifier and layer keys held anywhere in the editor.
+        AddHandler(KeyDownEvent, new KeyEventHandler(OnAnyKey), handledEventsToo: true);
+        AddHandler(KeyUpEvent, new KeyEventHandler(OnAnyKey), handledEventsToo: true);
+        _heldPoll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+        _heldPoll.Tick += (_, _) => ReportHeldKeys();
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(EditorViewModel.SelectedState)) return;
+            ResetHeldKeys();
+            if (viewModel.SelectedState.IsAuto) _heldPoll.Start(); else _heldPoll.Stop();
+        };
+        Unloaded += (_, _) => _heldPoll.Stop();
+        Loaded += (_, _) => { if (viewModel.SelectedState.IsAuto) _heldPoll.Start(); };
+    }
+
+    private readonly DispatcherTimer _heldPoll;
+    private readonly HashSet<(int ScanCode, bool Extended)> _heldKeys = [];
+
+    private static bool IsDown(VirtualKey key) => InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(CoreVirtualKeyStates.Down);
+
+    private void OnAnyKey(object sender, KeyRoutedEventArgs e)
+    {
+        if (!ViewModel.SelectedState.IsAuto) return;
+        var key = ((int)e.KeyStatus.ScanCode, e.KeyStatus.IsExtendedKey);
+        if (e.KeyStatus.IsKeyReleased) _heldKeys.Remove(key); else _heldKeys.Add(key);
+        ReportHeldKeys();
+    }
+
+    /// <summary>Tells the editor which keys are held; the timer also catches keys released outside the editor.</summary>
+    private void ReportHeldKeys() =>
+        ViewModel.SetHeldKeys(IsDown(VirtualKey.Shift), IsDown(VirtualKey.Control), IsDown(VirtualKey.Menu), _heldKeys);
+
+    /// <summary>Forgets held keys, e.g. when the window loses focus and key-up events go elsewhere.</summary>
+    internal void ResetHeldKeys()
+    {
+        _heldKeys.Clear();
+        ViewModel.SetHeldKeys(false, false, false, _heldKeys);
     }
 
     public EditorViewModel ViewModel { get; }
@@ -62,7 +100,7 @@ public sealed partial class EditorView : UserControl
     /// </summary>
     private void Preview_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        static bool Down(VirtualKey key) => InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(CoreVirtualKeyStates.Down);
+        static bool Down(VirtualKey key) => IsDown(key);
         if (e.Key is VirtualKey.Tab && !Down(VirtualKey.Control)) return; // keep Tab for focus navigation
 
         var status = e.KeyStatus;

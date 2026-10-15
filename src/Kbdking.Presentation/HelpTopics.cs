@@ -87,7 +87,9 @@ public static class HelpTopics
         // ------------------------------------------------------------ keys tab
         ["shift-state"] = new("Shift state",
             "Which modifier combination the keyboard picture shows. AltGr is the right Alt key; Windows treats it as Ctrl+Alt. " +
-            "Ctrl states mostly produce control codes and are rarely changed. Layer states appear here once you add a layer key."),
+            "Ctrl states mostly produce control codes and are rarely changed. Layer states appear here once you add a layer key.\n\n" +
+            "Auto follows the keys you hold: hold Shift, AltGr, Shift+AltGr or a layer key and the keyboard shows that state " +
+            "until you let go. The light grey keys are the home row, where the fingers rest."),
         ["keyboard-shape"] = new("Keyboard shape",
             "Only changes the picture, not the layout. ISO is the European keyboard (tall Enter, extra < > key), ANSI the US keyboard, " +
             "JIS the Japanese and ABNT the Brazilian one with their extra keys."),
@@ -158,7 +160,7 @@ public static class HelpTopics
 
         // ------------------------------------------------------------ layouts page
         ["layouts-page"] = new("Keyboard layouts on this PC",
-            "Every layout registered on this PC. The switch adds it to or removes it from your Win+Space list; that needs no " +
+            "Every layout registered on this PC, the ones in your switcher first. The switch adds it to or removes it from your Win+Space list; that needs no " +
             "administrator rights and deletes nothing.\n\n" +
             "\"Windows\" layouts come with Windows and can only be switched off. \"Custom\" layouts were installed by kbdking: " +
             "Uninstall removes their registry entry and files completely (you see the list first). \"Custom (test)\" layouts are test " +

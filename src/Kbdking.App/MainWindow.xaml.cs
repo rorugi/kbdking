@@ -32,6 +32,11 @@ public sealed partial class MainWindow : Window
             if (await editor.OpenFileInteractiveAsync(path)) Nav.SelectedItem = EditorItem;
         });
         AppWindow.Closing += OnClosing;
+        Activated += (_, e) =>
+        {
+            // Key-up events go to other windows while this one is in the background.
+            if (e.WindowActivationState == WindowActivationState.Deactivated) _editorView?.ResetHeldKeys();
+        };
 
         _aboutView = new AboutView();
         _layoutsView = new LayoutsView(manager);

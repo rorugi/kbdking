@@ -16,7 +16,10 @@ namespace Kbdking.Presentation;
 /// <summary>A shift state the editor can show, e.g. "Shift + AltGr".</summary>
 public sealed record ShiftStateOption(ShiftState State)
 {
-    public string Label => State.DisplayName;
+    /// <summary>"Auto": the keyboard shows the shift state of the modifier and layer keys held right now.</summary>
+    public bool IsAuto { get; init; }
+
+    public string Label => IsAuto ? "Auto (follows the keys you hold)" : State.DisplayName;
     public override string ToString() => Label;
 }
 
@@ -63,6 +66,7 @@ public sealed class EditorViewModel : ObservableObject
     private string? _filePath;
     private bool _isDirty;
     private ShiftStateOption _selectedState;
+    private ShiftState _heldState = ShiftState.Base;
     private KeyCapViewModel? _selectedKey;
     private KeyEditorViewModel? _keyEditor;
     private KeyboardShapeOption _shape;
@@ -130,14 +134,47 @@ public sealed class EditorViewModel : ObservableObject
 
     public ObservableCollection<ShiftStateOption> ShiftStates { get; } = [];
 
+    /// <summary>What the keyboard can show: <see cref="AutoState"/> followed by the layout's shift states.</summary>
+    public ObservableCollection<ShiftStateOption> ShiftStateChoices { get; } = [];
+
+    /// <summary>The "Auto" choice: the keyboard follows Shift, Ctrl, Alt, AltGr and layer keys as they are held.</summary>
+    public ShiftStateOption AutoState { get; } = new(ShiftState.Base) { IsAuto = true };
+
     public ShiftStateOption SelectedState
     {
         get => _selectedState;
         set
         {
             if (value is null || !SetProperty(ref _selectedState, value)) return;
+            _heldState = ShiftState.Base;
             RefreshKeyboard();
+            OnPropertyChanged(nameof(AutoStateText));
         }
+    }
+
+    /// <summary>The shift state the keyboard shows now.</summary>
+    public ShiftState DisplayedState => _selectedState.IsAuto ? _heldState : _selectedState.State;
+
+    /// <summary>In Auto mode: which state is shown, e.g. "Showing Shift + AltGr".</summary>
+    public string AutoStateText => _selectedState.IsAuto ? $"Showing {DisplayedState.DisplayName}" : "";
+
+    /// <summary>
+    /// Reports which keys are held (in Auto mode the keyboard switches to that shift state).
+    /// <paramref name="held"/> are the physical keys held, so layer keys count too.
+    /// </summary>
+    public void SetHeldKeys(bool shift, bool ctrl, bool alt, IReadOnlyCollection<(int ScanCode, bool Extended)> held)
+    {
+        if (!_selectedState.IsAuto) return;
+        var bits = ModifierBits.None;
+        if (shift) bits |= ModifierBits.Shift;
+        if (ctrl) bits |= ModifierBits.Ctrl;
+        if (alt) bits |= ModifierBits.Alt;
+        bits |= LayerKeys.HeldLayers(_layout, held);
+        var state = new ShiftState(bits);
+        if (state == _heldState) return;
+        _heldState = state;
+        RefreshKeyboard();
+        OnPropertyChanged(nameof(AutoStateText));
     }
 
     public IReadOnlyList<KeyboardShapeOption> Shapes { get; } = [.. Enum.GetValues<KeyboardShape>().Select(s => new KeyboardShapeOption(s))];
@@ -352,12 +389,18 @@ public sealed class EditorViewModel : ObservableObject
     /// <summary>Rebuilds the shift-state list (after adding or removing a state) and the keyboard.</summary>
     internal void ReloadShiftStates()
     {
-        var previous = _selectedState.State;
+        var previous = _selectedState;
         var ligatureState = Ligatures.NewState?.State;
         ShiftStates.Clear();
+        ShiftStateChoices.Clear();
+        ShiftStateChoices.Add(AutoState);
         foreach (var s in StandardStates.Concat(_layout.Modifiers.Columns).Distinct())
-            ShiftStates.Add(new ShiftStateOption(s));
-        _selectedState = ShiftStates.FirstOrDefault(s => s.State == previous) ?? ShiftStates[0];
+        {
+            var option = new ShiftStateOption(s);
+            ShiftStates.Add(option);
+            ShiftStateChoices.Add(option);
+        }
+        _selectedState = previous.IsAuto ? AutoState : ShiftStates.FirstOrDefault(s => s.State == previous.State) ?? ShiftStates[0];
         OnPropertyChanged(nameof(SelectedState));
         Ligatures.NewState = ShiftStates.FirstOrDefault(s => s.State == ligatureState);
         BuildKeyboard();
@@ -396,7 +439,7 @@ public sealed class EditorViewModel : ObservableObject
     /// <summary>Updates every key cap from the layout.</summary>
     internal void RefreshKeyboard()
     {
-        foreach (var k in _allKeys) k.Refresh(_layout, _selectedState.State);
+        foreach (var k in _allKeys) k.Refresh(_layout, DisplayedState);
     }
 
     // ---------------------------------------------------------------- editing

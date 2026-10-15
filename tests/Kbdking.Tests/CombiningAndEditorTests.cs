@@ -122,3 +122,61 @@ public partial class PresentationTests
         Assert.Contains("combining mark", row.Error, StringComparison.Ordinal);
     }
 }
+
+public partial class PresentationTests
+{
+    [Fact]
+    public void Auto_shift_state_follows_the_held_modifier_and_layer_keys()
+    {
+        var editor = NewEditor();
+        Assert.True(editor.ShiftStateChoices[0].IsAuto);
+        Assert.DoesNotContain(editor.ShiftStates, s => s.IsAuto); // the key editor and ligatures only see real states
+        Key(editor, (byte)'A').SelectCommand.Execute(null);
+        editor.KeyEditor!.Rows.First(r => r.State == ShiftState.AltGr).Text = "ā";
+        editor.KeyEditor!.Rows.First(r => r.State == ShiftState.ShiftAltGr).Text = "Ā";
+
+        editor.SelectedState = editor.AutoState;
+        Assert.Equal("a", Key(editor, (byte)'A').Label);
+        editor.SetHeldKeys(shift: true, ctrl: false, alt: false, []);
+        Assert.Equal("A", Key(editor, (byte)'A').Label);
+        editor.SetHeldKeys(shift: false, ctrl: true, alt: true, []);
+        Assert.Equal("ā", Key(editor, (byte)'A').Label);
+        Assert.Equal("Showing " + ShiftState.AltGr.DisplayName, editor.AutoStateText);
+        editor.SetHeldKeys(shift: true, ctrl: true, alt: true, []);
+        Assert.Equal("Ā", Key(editor, (byte)'A').Label);
+        editor.SetHeldKeys(false, false, false, []);
+        Assert.Equal("a", Key(editor, (byte)'A').Label);
+
+        // A layer key held by its scan code shows the layer.
+        Kbdking.Core.Editing.LayerKeys.Add(editor.Layout, 0x3A, false, ModifierBits.LayerA);
+        editor.LayoutChangedExternally();
+        Assert.True(editor.SelectedState.IsAuto);
+        editor.SetHeldKeys(false, false, false, [(0x3A, false)]);
+        Assert.Equal(new ShiftState(ModifierBits.LayerA), editor.DisplayedState);
+
+        // Other views ignore held keys.
+        editor.SelectedState = editor.ShiftStates.First(s => s.State == ShiftState.Base);
+        editor.SetHeldKeys(true, false, false, []);
+        Assert.Equal("a", Key(editor, (byte)'A').Label);
+        Assert.Equal("", editor.AutoStateText);
+    }
+
+    [Fact]
+    public void Home_row_keys_are_marked()
+    {
+        var editor = NewEditor();
+        var home = editor.KeyboardRows.SelectMany(r => r.Keys).Where(k => k.IsHomeKey).Select(k => k.Key.ScanCode).Order().ToArray();
+        Assert.Equal(new[] { 0x1E, 0x1F, 0x20, 0x21, 0x24, 0x25, 0x26, 0x27 }, home);
+    }
+
+    [Fact]
+    public void Layouts_in_the_switcher_come_first()
+    {
+        var system = new FakeSystem();
+        system.Layouts.Insert(0, new() { Klid = "00000409", LayoutFile = "KBDUS.DLL", Name = "US" });
+        system.Layouts.Add(new() { Klid = "00000809", LayoutFile = "KBDUK.DLL", Name = "United Kingdom", IsEnabled = true });
+        var manager = new LayoutManagerViewModel(system, new FakePrivileged(), new FakeDialogs(), _ => { });
+        manager.Refresh();
+        Assert.Equal(new[] { "German", "United Kingdom", "German (Austria) + IAST", "US" }, manager.Layouts.Select(l => l.Name).ToArray());
+    }
+}

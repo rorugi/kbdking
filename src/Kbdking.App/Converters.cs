@@ -13,10 +13,11 @@ public static class Converters
 
     public static Visibility VisibleIfText(string? value) => string.IsNullOrEmpty(value) ? Visibility.Collapsed : Visibility.Visible;
 
-    public static Brush KeyBackground(bool isSelected, bool isDead, bool isCharacterKey, bool isHighlighted) =>
+    public static Brush KeyBackground(bool isSelected, bool isDead, bool isCharacterKey, bool isHighlighted, bool isHomeKey) =>
         Resource(isSelected ? "SystemFillColorAttentionBackgroundBrush"
             : isHighlighted ? "SystemFillColorSuccessBackgroundBrush"
             : isDead ? "SystemFillColorCautionBackgroundBrush"
+            : isHomeKey ? "ControlAltFillColorQuarternaryBrush" // light grey: where the fingers rest
             : isCharacterKey ? "ControlFillColorDefaultBrush"
             : "ControlFillColorTertiaryBrush");
 

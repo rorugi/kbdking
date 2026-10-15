@@ -111,7 +111,9 @@ public sealed class LayoutManagerViewModel : ObservableObject
     {
         try
         {
-            _all = [.. _system.GetLayouts().Select(l => new LayoutItemViewModel(this, l))];
+            // Layouts in the switcher first, then the rest; each group by name.
+            _all = [.. _system.GetLayouts().Select(l => new LayoutItemViewModel(this, l))
+                .OrderByDescending(l => l.IsEnabled).ThenBy(l => l.Name, StringComparer.CurrentCultureIgnoreCase)];
             ApplyFilter();
             var enabled = _all.Count(l => l.IsEnabled);
             Status = $"{_all.Count} layouts, {enabled} in your switcher, {_all.Count(l => l.IsCustom)} custom.";

@@ -127,9 +127,15 @@
                                 Header="Shift state"
                                 MinWidth="200"
                                 DisplayMemberPath="Label"
-                                ItemsSource="{x:Bind ViewModel.ShiftStates}"
+                                ItemsSource="{x:Bind ViewModel.ShiftStateChoices}"
                                 SelectedItem="{Binding SelectedState, Mode=TwoWay}" />
                             <views:InfoButton VerticalAlignment="Bottom" Topic="shift-state" />
+                            <TextBlock
+                                VerticalAlignment="Bottom"
+                                Margin="0,0,0,6"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ViewModel.AutoStateText, Mode=OneWay}"
+                                Visibility="{x:Bind local:Converters.VisibleIfText(ViewModel.AutoStateText), Mode=OneWay}" />
                             <ComboBox
                                 Header="Keyboard"
                                 MinWidth="200"
@@ -157,7 +163,7 @@
                                                     Padding="4,2"
                                                     HorizontalContentAlignment="Stretch"
                                                     VerticalContentAlignment="Stretch"
-                                                    Background="{x:Bind local:Converters.KeyBackground(IsSelected, IsDead, IsCharacterKey, IsHighlighted), Mode=OneWay}"
+                                                    Background="{x:Bind local:Converters.KeyBackground(IsSelected, IsDead, IsCharacterKey, IsHighlighted, IsHomeKey), Mode=OneWay}"
                                                     Command="{x:Bind SelectCommand}"
                                                     ToolTipService.ToolTip="{x:Bind ToolTip, Mode=OneWay}">
                                                     <Grid>

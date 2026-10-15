@@ -54,6 +54,9 @@ public sealed class KeyCapViewModel : ObservableObject
         ? $"Scan code {(Key.Extended ? "E0 " : "")}{Key.ScanCode:X2}, virtual key {VirtualKeys.GetName(vk)}"
         : $"Scan code {(Key.Extended ? "E0 " : "")}{Key.ScanCode:X2}";
 
+    /// <summary>The eight home-row keys where the fingers rest (A S D F and J K L Ö on a German keyboard).</summary>
+    public bool IsHomeKey => !Key.Extended && Key.ScanCode is 0x1E or 0x1F or 0x20 or 0x21 or 0x24 or 0x25 or 0x26 or 0x27;
+
     public ICommand SelectCommand { get; }
 
     internal void Refresh(KeyboardLayout layout, ShiftState state)
