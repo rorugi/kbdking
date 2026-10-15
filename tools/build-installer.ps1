@@ -11,7 +11,7 @@
         .\tools\build-installer.ps1 -Arch arm64      # Windows on ARM
         .\tools\build-installer.ps1 -Version 0.2.0
 
-    Needs the .NET 10 SDK. The installer stub (for "Create installer…") is NativeAOT and needs the
+    Needs the .NET 10 SDK. The installer stub (for "Create installer...") is NativeAOT and needs the
     "Desktop development with C++" workload of Visual Studio or the Build Tools; without it the MSI is built
     anyway and that one feature is missing.
 #>
@@ -46,7 +46,7 @@ $stubRid = if ($Arch -eq 'arm64') { 'win-x64' } else { $rid }
 $stubOut = Join-Path $Output "stub-$stubRid"
 dotnet publish src/Keyservant.Stub/Keyservant.Stub.csproj -c Release -r $stubRid "-p:Version=$Version" -o $stubOut
 if ($LASTEXITCODE -eq 0) { Copy-Item (Join-Path $stubOut 'Keyservant.Stub.exe') $publish }
-else { Write-Warning 'The installer stub could not be built (C++ build tools missing?). "Create installer…" will not be available.' }
+else { Write-Warning 'The installer stub could not be built (C++ build tools missing?). "Create installer..." will not be available.' }
 
 # Debug symbols aren't needed on users' PCs.
 Get-ChildItem $publish -Recurse -Filter *.pdb | Remove-Item
@@ -56,7 +56,13 @@ if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
     $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
 }
 
+foreach ($ext in 'WixToolset.UI.wixext', 'WixToolset.Util.wixext') {
+    if (-not ((wix extension list -g) -match [regex]::Escape($ext))) {
+        Invoke-Checked "Add WiX extension $ext" { wix extension add -g "$ext/5.0.2" }
+    }
+}
+
 $msi = Join-Path $Output "Keyservant-$Arch.msi"
 $fullPublish = (Resolve-Path $publish).Path
-Invoke-Checked 'Build MSI' { wix build installer/Keyservant.wxs -arch $Arch -d "PublishDir=$fullPublish" -d "Version=$Version" -o $msi }
+Invoke-Checked 'Build MSI' { wix build installer/Keyservant.wxs -arch $Arch -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "PublishDir=$fullPublish" -d "Version=$Version" -o $msi }
 Write-Host "Created $msi"

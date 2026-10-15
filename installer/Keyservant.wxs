@@ -3,9 +3,10 @@
   Windows installer (MSI) for the Keyservant app. Built by tools/build-installer.ps1:
     wix build installer/Keyservant.wxs -arch x64 -d PublishDir=<published app> -d Version=0.1.42 -o Keyservant-x64.msi
   Installs for all users into Program Files\Keyservant, adds a Start menu entry and puts keyservant.exe on the PATH.
-  Upgrades replace older versions; uninstall from Settings > Apps.
+  Upgrades replace older versions; uninstall from Settings > Apps. Shows a welcome/licence page and offers to
+  start Keyservant at the end (needs -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext).
 -->
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
       Name="Keyservant"
       Manufacturer="Keyservant contributors"
@@ -20,6 +21,18 @@
 
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/rorugi/keyservant" />
     <Property Id="ARPCOMMENTS" Value="Create, edit and install Windows keyboard layouts." />
+
+    <!-- Setup screens: welcome + licence, progress, and a finish page that can start the app. -->
+    <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)License.rtf" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start Keyservant now" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WixShellExecTarget" Value="[INSTALLFOLDER]Keyservant.App.exe" />
+    <CustomAction Id="LaunchKeyservant" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
+    <UI>
+      <ui:WixUI Id="WixUI_Minimal" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchKeyservant"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+    </UI>
 
     <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLFOLDER" Name="Keyservant">

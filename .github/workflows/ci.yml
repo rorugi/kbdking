@@ -245,6 +245,8 @@ jobs:
             Write-Output "::error title=Installed app::exited with $($app.ExitCode)%0A$details"
             exit 1
           }
+          if ($app.MainWindowHandle -eq 0) { Write-Output '::error title=Installed app::is running but shows no window'; Stop-Process -Id $app.Id -Force; exit 1 }
+          Write-Output "::notice title=Installed app::window '$($app.MainWindowTitle)' is open"
           Stop-Process -Id $app.Id -Force
           $p = Start-Process msiexec.exe -ArgumentList '/x', "`"$msi`"", '/qn' -Wait -PassThru
           if ($p.ExitCode -ne 0 -or (Test-Path (Join-Path $dir 'Keyservant.App.exe'))) { Write-Output '::error title=Installer::uninstall failed'; exit 1 }
