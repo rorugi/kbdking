@@ -4,6 +4,7 @@ using Keyservant.Core.Analysis;
 using Keyservant.Core.Assist;
 using Keyservant.Core.Compose;
 using Keyservant.Core.Diff;
+using Keyservant.Core.Editing;
 using Keyservant.Core.Formats;
 using Keyservant.Core.Geometry;
 using Keyservant.Core.Model;
@@ -188,6 +189,84 @@ internal static partial class Program
         foreach (var r in results) Out.WriteLine($"{r.Display}\t{r.Code}\t{r.Name}");
         if (results.Count == 0) Out.WriteLine("Nothing found.");
         return Ok;
+    }
+
+    private static int Shortcuts(CommandLine cmd)
+    {
+        var path = cmd.Arg(0, "layout file");
+        var modeText = cmd.Positional.Count > 1 ? cmd.Positional[1] : null;
+        var output = cmd.Option("output", "o");
+        cmd.EnsureNoUnknownOptions();
+        var layout = Load(path);
+        if (modeText is null)
+        {
+            var modes = ShortcutPositions.Detect(layout);
+            Out.WriteLine(modes.Count == 0 ? "Shortcuts: mixed (neither at the letters nor at standard positions)." : "Shortcuts: " + string.Join("; ", modes.Select(ShortcutPositions.DisplayName)));
+            return Ok;
+        }
+        var mode = modeText.ToLowerInvariant() switch
+        {
+            "letters" or "follow" => ShortcutMode.FollowLetters,
+            "qwerty" => ShortcutMode.Qwerty,
+            "qwertz" => ShortcutMode.Qwertz,
+            "azerty" => ShortcutMode.Azerty,
+            _ => throw new UsageException("Mode must be letters, qwerty, qwertz or azerty."),
+        };
+        var moved = ShortcutPositions.Apply(layout, mode);
+        Save(layout, output ?? path);
+        Out.WriteLine($"{ShortcutPositions.DisplayName(mode)}: {moved} keys got a new virtual key; every key still types the same characters.");
+        return Ok;
+    }
+
+    private static int Layers(CommandLine cmd)
+    {
+        var path = cmd.Arg(0, "layout file");
+        var action = cmd.Positional.Count > 1 ? cmd.Positional[1].ToLowerInvariant() : "list";
+        var output = cmd.Option("output", "o");
+        cmd.EnsureNoUnknownOptions();
+        var layout = Load(path);
+        switch (action)
+        {
+            case "list":
+                var keys = LayerKeys.Find(layout);
+                foreach (var k in keys) Out.WriteLine($"{k.Code,-6} {k.LayerName}  (virtual key {VirtualKeys.GetName(k.VirtualKey)})");
+                if (keys.Count == 0) Out.WriteLine("No layer keys. Add one with: keyservant layers <file> add 3A A");
+                return Ok;
+            case "add":
+            {
+                var (scan, extended) = Core.Compose.ComposeDefinition.ParseKey(cmd.Arg(2, "key (scan code, e.g. 3A or E0 5D)"));
+                var layer = cmd.Arg(3, "layer (A, B or C)").ToUpperInvariant() switch
+                {
+                    "A" => ModifierBits.LayerA,
+                    "B" => ModifierBits.LayerB,
+                    "C" => ModifierBits.LayerC,
+                    _ => throw new UsageException("The layer must be A, B or C."),
+                };
+                var note = LayerKeys.Add(layout, scan, extended, layer);
+                Save(layout, output ?? path);
+                Out.WriteLine($"{(extended ? "E0 " : "")}{scan:X2} now selects {new ShiftState(layer).DisplayName} while held. {note}".TrimEnd());
+                Out.WriteLine($"Put characters on it with the state name \"{new ShiftState(layer).Name}\" in the file, or in the app.");
+                return Ok;
+            }
+            case "remove":
+            {
+                var (scan, extended) = Core.Compose.ComposeDefinition.ParseKey(cmd.Arg(2, "key"));
+                var key = LayerKeys.Find(layout).FirstOrDefault(k => k.ScanCode == scan && k.Extended == extended)
+                    ?? throw new UsageException("That key is not a layer key.");
+                LayerKeys.Remove(layout, key);
+                Save(layout, output ?? path);
+                Out.WriteLine($"{key.Code} is a normal key again; the {key.LayerName} characters are kept.");
+                return Ok;
+            }
+            default:
+                throw new UsageException($"Unknown layers action '{action}'. Use list, add or remove.");
+        }
+    }
+
+    private static void Save(KeyboardLayout layout, string target)
+    {
+        if (!target.EndsWith(".keyservant", StringComparison.OrdinalIgnoreCase)) throw new UsageException("Changes can only be saved to a .keyservant file; pass -o <file>.keyservant.");
+        File.WriteAllText(target, KeyservantFormat.Serialize(layout));
     }
 
     [SupportedOSPlatform("windows")]

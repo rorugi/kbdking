@@ -74,6 +74,8 @@ internal static partial class Program
                 "diff" => Diff(cmd),
                 "render" => Render(cmd),
                 "unicode" => UnicodeSearch(cmd),
+                "shortcuts" => Shortcuts(cmd),
+                "layers" => Layers(cmd),
                 "list" or "enable" or "disable" or "import" or "install" or "uninstall" or "repair" or "keep" or "cleanup" =>
                     OperatingSystem.IsWindows() ? RunWindowsCommand(args[0].ToLowerInvariant(), cmd, args) : NotWindows(),
                 _ => throw new UsageException($"Unknown command '{args[0]}'. Run 'keyservant help' for the list of commands."),
@@ -91,6 +93,7 @@ internal static partial class Program
             return Invalid;
         }
         catch (Exception ex) when (ex is LayoutFormatException or LayoutSystemException or NotSupportedException
+                                       or InvalidOperationException or ArgumentException or FormatException
                                        or IOException or UnauthorizedAccessException or InvalidDataException
                                        or Keyservant.Binary.Pe.InvalidLayoutDllException)
         {
@@ -127,6 +130,12 @@ internal static partial class Program
               keyservant analyze <file> <text.txt>         Typing effort and a heatmap for a text
                          [--heatmap <out.svg>] [--compare <other layout>]
               keyservant unicode <words or code>           Search characters by name, e.g. "a macron"
+              keyservant shortcuts <file> [mode] [-o out]  Show or set where Ctrl+C/V/Z are:
+                                                           letters | qwerty | qwertz | azerty
+              keyservant layers <file>                     List layer keys
+              keyservant layers <file> add <key> <A|B|C>   Make a key a layer key, e.g. add 3A A (Caps Lock),
+                                                           add 56 B (the < > key), add E05D A (Menu key)
+              keyservant layers <file> remove <key>        Turn a layer key back into a normal key
 
             Packages
               keyservant package <file> -o <setup.exe>     Standalone installer [--stub <path>]

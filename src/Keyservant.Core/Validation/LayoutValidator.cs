@@ -146,6 +146,19 @@ public static partial class LayoutValidator
             Add(Severity.Warning, "KS050", "The layout has no key names; Windows will show empty names for keys like Shift or Enter.");
 
         // Compose sequences
+        // Characters on a layer nobody can reach.
+        var reachable = ModifierBits.Shift | ModifierBits.Ctrl | ModifierBits.Alt;
+        foreach (var b in layout.Modifiers.VkToBits)
+        {
+            var sent = layout.ScanCodes.Normal.Any(t => t.VirtualKey == b.VirtualKey) || layout.ScanCodes.E0.Values.Any(t => t.VirtualKey == b.VirtualKey);
+            if (sent || b.VirtualKey is VirtualKeys.Shift or VirtualKeys.Control or VirtualKeys.Menu) reachable |= b.Bits;
+        }
+        foreach (var state in layout.Modifiers.Columns.Where(c => (c.Bits & ~reachable) != 0))
+        {
+            if (layout.Keys.Any(k => k.Outputs.ContainsKey(state)))
+                Add(Severity.Warning, "KS090", $"{state.DisplayName} has characters, but no key on the keyboard selects it. Add a layer key (Advanced → Shift states) or assign the modifier's virtual key to a scan code.");
+        }
+
         if (layout.Compose is { Sequences.Count: > 0 })
         {
             var compiled = Compose.ComposeCompiler.Compile(layout);

@@ -27,6 +27,13 @@ public sealed record KeyboardShapeOption(KeyboardShape Shape)
     public override string ToString() => Label;
 }
 
+/// <summary>Where letter shortcuts (Ctrl+C, Ctrl+V…) are.</summary>
+public sealed record ShortcutModeOption(ShortcutMode Mode)
+{
+    public string Label => ShortcutPositions.DisplayName(Mode);
+    public override string ToString() => Label;
+}
+
 /// <summary>One row of the on-screen keyboard.</summary>
 public sealed class KeyboardRowViewModel
 {
@@ -49,6 +56,8 @@ public sealed class EditorViewModel : ObservableObject
     private readonly List<KeyCapViewModel> _allKeys = [];
     private readonly LayoutHistory _history;
     private TypingSimulator? _simulator;
+    private KeyboardLayout? _effective;
+    private readonly HashSet<(int, bool)> _heldLayerKeys = [];
     private KeyboardLayout _layout;
     private string? _filePath;
     private bool _isDirty;
@@ -194,6 +203,51 @@ public sealed class EditorViewModel : ObservableObject
     public string? Description { get => _layout.Metadata.Description; set { _layout.Metadata.Description = value; MarkChanged("description"); } }
     public string? LayoutId => _layout.Metadata.LayoutId;
 
+    public IReadOnlyList<ShortcutModeOption> ShortcutModes { get; } = [.. Enum.GetValues<ShortcutMode>().Select(m => new ShortcutModeOption(m))];
+
+    /// <summary>
+    /// Where Ctrl+C, Ctrl+V, Ctrl+Z… are. Choosing a fixed keyboard keeps them under the same fingers on
+    /// Colemak, Dvorak, Neo or any custom arrangement, while every key keeps typing the same characters.
+    /// Null when the layout matches none of the options.
+    /// </summary>
+    public ShortcutModeOption? SelectedShortcutMode
+    {
+        get
+        {
+            var modes = ShortcutPositions.Detect(_layout);
+            var mode = modes.Contains(ShortcutMode.FollowLetters) ? ShortcutMode.FollowLetters : modes.Count > 0 ? modes[0] : (ShortcutMode?)null;
+            return mode is { } m ? ShortcutModes.First(o => o.Mode == m) : null;
+        }
+        set
+        {
+            if (value is null || ShortcutPositions.Detect(_layout).Contains(value.Mode)) return;
+            try
+            {
+                var moved = ShortcutPositions.Apply(_layout, value.Mode);
+                LayoutChangedExternally($"Shortcuts: {value.Label.ToLowerInvariant()}. {moved} keys got a new virtual key; every key still types the same characters.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Status = ex.Message;
+            }
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ShortcutSummary));
+        }
+    }
+
+    public string ShortcutSummary
+    {
+        get
+        {
+            var modes = ShortcutPositions.Detect(_layout);
+            if (modes.Count == 0) return "Shortcuts are neither at the letters nor at standard positions (mixed).";
+            var positions = modes.Where(m => m != ShortcutMode.FollowLetters).Select(m => ShortcutPositions.DisplayName(m).Replace("Stay at ", "", StringComparison.Ordinal)).ToList();
+            return modes.Contains(ShortcutMode.FollowLetters)
+                ? positions.Count > 0 ? $"Shortcuts follow the letters, which here are at {string.Join(" and ", positions)}." : "Shortcuts follow the letters: Ctrl+C is wherever the layout types c."
+                : $"Shortcuts stay at {string.Join(" and ", positions)}, independent of what the keys type.";
+        }
+    }
+
     public bool AltGrFlag
     {
         get => _layout.Flags.HasFlag(LocaleFlags.AltGr);
@@ -248,6 +302,8 @@ public sealed class EditorViewModel : ObservableObject
         _layout = layout;
         _filePath = path;
         _simulator = null;
+        _effective = null;
+        _heldLayerKeys.Clear();
         PreviewText = "";
         if (resetHistory) _history.Reset(layout);
 
@@ -263,7 +319,7 @@ public sealed class EditorViewModel : ObservableObject
         Analysis.LayoutReplaced();
         Compare.LayoutReplaced();
         IsDirty = false;
-        foreach (var p in new[] { nameof(LayoutName), nameof(DllName), nameof(Locale), nameof(LayoutVersion), nameof(Author), nameof(Description), nameof(LayoutId), nameof(AltGrFlag), nameof(Title) })
+        foreach (var p in new[] { nameof(LayoutName), nameof(DllName), nameof(Locale), nameof(LayoutVersion), nameof(Author), nameof(Description), nameof(LayoutId), nameof(AltGrFlag), nameof(Title), nameof(SelectedShortcutMode), nameof(ShortcutSummary) })
             OnPropertyChanged(p);
         Validate();
     }
@@ -343,6 +399,7 @@ public sealed class EditorViewModel : ObservableObject
     {
         IsDirty = true;
         _simulator = null;
+        _effective = null;
         _history.Record(_layout, group);
         Validate();
         Tests.UpdateResults();
@@ -360,6 +417,8 @@ public sealed class EditorViewModel : ObservableObject
         Ligatures.Load();
         Compose.Load();
         Tests.Load();
+        OnPropertyChanged(nameof(SelectedShortcutMode));
+        OnPropertyChanged(nameof(ShortcutSummary));
         if (status is not null) Status = status;
     }
 
@@ -393,7 +452,13 @@ public sealed class EditorViewModel : ObservableObject
     /// </summary>
     public bool HandlePreviewKey(int scanCode, bool extended, bool shift, bool ctrl, bool alt, bool capsLock)
     {
-        _simulator ??= new TypingSimulator(EffectiveLayout());
+        _effective ??= EffectiveLayout();
+        _simulator ??= new TypingSimulator(_effective);
+        if (LayerKeys.HeldLayers(_effective, [(scanCode, extended)]) != ModifierBits.None)
+        {
+            _heldLayerKeys.Add((scanCode, extended));
+            return true;
+        }
         if (scanCode == 0x0E && !extended) // Backspace
         {
             if (PreviewText.Length > 0) PreviewText = PreviewText[..^(char.IsLowSurrogate(PreviewText[^1]) && PreviewText.Length > 1 ? 2 : 1)];
@@ -404,6 +469,9 @@ public sealed class EditorViewModel : ObservableObject
         if (shift) bits |= ModifierBits.Shift;
         if (ctrl) bits |= ModifierBits.Ctrl;
         if (alt) bits |= ModifierBits.Alt;
+        bits |= LayerKeys.HeldLayers(_effective, _heldLayerKeys);
+        // When Caps Lock is a layer key here, the PC's own Caps Lock toggle means nothing for this layout.
+        if (!_effective.ScanCodes.Normal.Any(t => t.VirtualKey == 0x14)) capsLock = false;
         var text = _simulator.PressScanCode(scanCode, extended, new ShiftState(bits), capsLock);
         if (text.Length == 0) return _simulator.PendingDeadKey is not null;
         // Control characters (Enter, Tab, Ctrl+letter) are not useful in the preview, except new lines.
@@ -412,6 +480,9 @@ public sealed class EditorViewModel : ObservableObject
         PreviewText += text;
         return true;
     }
+
+    /// <summary>Releases a layer key in the preview. Returns true if it was one.</summary>
+    public bool HandlePreviewKeyUp(int scanCode, bool extended) => _heldLayerKeys.Remove((scanCode, extended));
 
     // ---------------------------------------------------------------- files
 

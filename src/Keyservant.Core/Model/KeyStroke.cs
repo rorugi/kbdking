@@ -53,6 +53,9 @@ public static class KeySequence
                 case "alt": bits |= ModifierBits.Alt; break;
                 case "altgr": bits |= ModifierBits.AltGr; break;
                 case "kana": bits |= ModifierBits.Kana; break;
+                case "layera" or "layer-a": bits |= ModifierBits.LayerA; break;
+                case "layerb" or "layer-b": bits |= ModifierBits.LayerB; break;
+                case "layerc" or "layer-c": bits |= ModifierBits.LayerC; break;
                 case "caps" or "capslock": caps = true; break;
                 default: throw new FormatException($"Unknown modifier '{m}' in '{token}'.");
             }
@@ -98,6 +101,10 @@ public static class KeySequence
         throw new FormatException($"No key types '{keyPart}' in this layout (in '{token}'). Use a virtual key name such as OEM_PERIOD.");
     }
 
+    /// <summary>"Shift+AltGr", "LayerA" ...: modifier names without spaces, as <see cref="Parse"/> reads them.</summary>
+    public static string ModifierTokens(ShiftState state) =>
+        string.Join("+", state.DisplayName.Split(" + ").Select(p => p.Replace(" ", "", StringComparison.Ordinal)));
+
     /// <summary>Formats strokes in the same notation <see cref="Parse"/> accepts.</summary>
     public static string Format(IEnumerable<KeyStroke> strokes, KeyboardLayout layout)
     {
@@ -106,7 +113,7 @@ public static class KeySequence
         {
             if (sb.Length > 0) sb.Append(' ');
             if (s.CapsLock) sb.Append("Caps+");
-            if (s.State.Bits != ModifierBits.None) sb.Append(s.State.DisplayName.Replace(" + ", "+", StringComparison.Ordinal)).Append('+');
+            if (s.State.Bits != ModifierBits.None) sb.Append(ModifierTokens(s.State)).Append('+');
             var key = layout.FindKey(s.VirtualKey);
             var label = key?.Outputs.GetValueOrDefault(ShiftState.Base) is { } o && o.Text.Length == 1 && !char.IsWhiteSpace(o.Text[0]) && !char.IsControl(o.Text[0]) && o.Text != "+"
                 ? o.Text

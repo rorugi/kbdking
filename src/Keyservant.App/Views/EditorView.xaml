@@ -220,6 +220,7 @@
                                 Header="Try it: click here and type. Keystrokes use the layout you are editing, not the active Windows layout."
                                 IsReadOnly="True"
                                 PreviewKeyDown="Preview_PreviewKeyDown"
+                                PreviewKeyUp="Preview_PreviewKeyUp"
                                 Text="{x:Bind ViewModel.PreviewText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                             <Button Content="Clear" Command="{x:Bind ViewModel.ClearPreviewCommand}" />
@@ -615,6 +616,7 @@
                         <Grid RowSpacing="12" Padding="0,8">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
@@ -622,7 +624,46 @@
                                 Style="{StaticResource BodyTextBlockStyle}"
                                 TextWrapping="Wrap"
                                 Text="Each shift state is a column of characters. AltGr is Ctrl + Alt. Kana states need a key that sends KANA (set one on the Scan codes tab); Kana then works as a lock, like in Japanese layouts." />
-                            <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.ShiftStateEditor.Columns}" SelectionMode="None">
+                            <StackPanel Grid.Row="1" Spacing="8" Padding="12" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Layer keys" />
+                                <TextBlock
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    TextWrapping="Wrap"
+                                    Text="A layer key works like an extra Shift: hold it and the keys type the layer's characters (Greek, symbols, IAST…). It is built into the layout, so it works in every app without extra software." />
+                                <ItemsControl ItemsSource="{x:Bind ViewModel.ShiftStateEditor.LayerKeyRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:LayerKeyRowViewModel">
+                                            <Grid Padding="0,4" ColumnSpacing="16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{x:Bind Description}" />
+                                                    <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind Details}" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Remove" Command="{x:Bind RemoveCommand}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <ComboBox
+                                        MinWidth="260"
+                                        DisplayMemberPath="Label"
+                                        ItemsSource="{x:Bind ViewModel.ShiftStateEditor.LayerKeyOptions}"
+                                        SelectedItem="{Binding ShiftStateEditor.SelectedLayerKeyOption, Mode=TwoWay}" />
+                                    <ComboBox
+                                        MinWidth="140"
+                                        DisplayMemberPath="Label"
+                                        ItemsSource="{x:Bind ViewModel.ShiftStateEditor.LayerOptions}"
+                                        SelectedItem="{Binding ShiftStateEditor.SelectedLayer, Mode=TwoWay}" />
+                                    <CheckBox Content="With Shift" IsChecked="{x:Bind ViewModel.ShiftStateEditor.LayerWithShift, Mode=TwoWay}" />
+                                    <Button Content="Add layer key" Command="{x:Bind ViewModel.ShiftStateEditor.AddLayerKeyCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                            <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.ShiftStateEditor.Columns}" SelectionMode="None">
                                 <ListView.ItemTemplate>
                                     <DataTemplate x:DataType="vm:ShiftColumnViewModel">
                                         <Grid Padding="0,6" ColumnSpacing="16">
@@ -643,7 +684,7 @@
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
                             </ListView>
-                            <StackPanel Grid.Row="2" Spacing="8">
+                            <StackPanel Grid.Row="3" Spacing="8">
                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                     <CheckBox Content="Shift" IsChecked="{x:Bind ViewModel.ShiftStateEditor.AddShift, Mode=TwoWay}" />
                                     <CheckBox Content="Ctrl" IsChecked="{x:Bind ViewModel.ShiftStateEditor.AddCtrl, Mode=TwoWay}" />
@@ -784,6 +825,18 @@
                         <TextBox Header="Author" Text="{x:Bind ViewModel.Author, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBox Header="Description" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" Text="{x:Bind ViewModel.Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <CheckBox Content="Right Alt acts as AltGr" IsChecked="{x:Bind ViewModel.AltGrFlag, Mode=TwoWay}" />
+                        <ComboBox
+                            Header="Shortcuts (Ctrl+C, Ctrl+V, Ctrl+Z …)"
+                            HorizontalAlignment="Stretch"
+                            DisplayMemberPath="Label"
+                            ItemsSource="{x:Bind ViewModel.ShortcutModes}"
+                            PlaceholderText="Mixed"
+                            SelectedItem="{Binding SelectedShortcutMode, Mode=TwoWay}" />
+                        <TextBlock
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextWrapping="Wrap"
+                            Text="{x:Bind ViewModel.ShortcutSummary, Mode=OneWay}" />
                         <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
                             <Run Text="Layout ID: " />
                             <Run Text="{x:Bind ViewModel.LayoutId, Mode=OneWay, TargetNullValue='assigned on first install'}" />

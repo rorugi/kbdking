@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Input;
+using Keyservant.Core.Editing;
 using Keyservant.Core.Model;
 
 namespace Keyservant.Presentation;
@@ -33,6 +34,25 @@ public sealed class ShiftColumnViewModel
     public ICommand RemoveCommand { get; }
 }
 
+/// <summary>A key that selects a layer while held.</summary>
+public sealed class LayerKeyRowViewModel(ShiftStatesViewModel owner, LayerKey key)
+{
+    public LayerKey Key { get; } = key;
+    public string Description => $"{KeyName(Key.ScanCode, Key.Extended)} → {Key.LayerName}";
+    public string Details => $"Scan code {Key.Code}, virtual key {VirtualKeys.GetName(Key.VirtualKey)}";
+    public ICommand RemoveCommand { get; } = new RelayCommand(() => owner.RemoveLayerKey(key));
+
+    internal static string KeyName(int scanCode, bool extended) =>
+        LayerKeys.CommonKeys.FirstOrDefault(k => k.ScanCode == scanCode && k.Extended == extended).Name ?? $"Key {(extended ? "E0 " : "")}{scanCode:X2}";
+}
+
+/// <summary>A place for a new layer key.</summary>
+public sealed record LayerKeyOption(string Name, int ScanCode, bool Extended)
+{
+    public string Label => $"{Name} ({(Extended ? "E0 " : "")}{ScanCode:X2})";
+    public override string ToString() => Label;
+}
+
 /// <summary>Shift-state management: which modifier combinations have their own characters, including Kana.</summary>
 public sealed class ShiftStatesViewModel : ObservableObject
 {
@@ -44,6 +64,57 @@ public sealed class ShiftStatesViewModel : ObservableObject
     {
         _editor = editor;
         AddCommand = new RelayCommand(Add);
+        AddLayerKeyCommand = new RelayCommand(AddLayerKey);
+        _layerKeyOption = LayerKeyOptions[0];
+        _layer = LayerOptions[0];
+    }
+
+    private LayerKeyOption? _layerKeyOption;
+    private ShiftStateOption? _layer;
+    private bool _layerWithShift = true;
+
+    public ObservableCollection<LayerKeyRowViewModel> LayerKeyRows { get; } = [];
+
+    public IReadOnlyList<LayerKeyOption> LayerKeyOptions { get; } = [.. LayerKeys.CommonKeys.Select(k => new LayerKeyOption(k.Name, k.ScanCode, k.Extended))];
+
+    public IReadOnlyList<ShiftStateOption> LayerOptions { get; } = [.. LayerKeys.Layers.Select(l => new ShiftStateOption(new ShiftState(l)))];
+
+    public LayerKeyOption? SelectedLayerKeyOption { get => _layerKeyOption; set => SetProperty(ref _layerKeyOption, value); }
+
+    public ShiftStateOption? SelectedLayer { get => _layer; set => SetProperty(ref _layer, value); }
+
+    /// <summary>Also add the Shift + layer column (capitals on the layer).</summary>
+    public bool LayerWithShift { get => _layerWithShift; set => SetProperty(ref _layerWithShift, value); }
+
+    public ICommand AddLayerKeyCommand { get; }
+
+    /// <summary>Adds a layer key on a given physical key (also used by tests).</summary>
+    public void AddLayerKey(int scanCode, bool extended, ModifierBits layer)
+    {
+        try
+        {
+            var note = LayerKeys.Add(_editor.Layout, scanCode, extended, layer, _layerWithShift);
+            var name = new ShiftState(layer).DisplayName;
+            Message = $"{LayerKeyRowViewModel.KeyName(scanCode, extended)} now selects {name} while held. {note} Pick \"{name}\" in the shift-state list on the Keys tab to fill the layer.".Replace("  ", " ", StringComparison.Ordinal);
+            _editor.LayoutChangedExternally();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            Message = ex.Message;
+        }
+    }
+
+    private void AddLayerKey()
+    {
+        if (_layerKeyOption is null || _layer is null) return;
+        AddLayerKey(_layerKeyOption.ScanCode, _layerKeyOption.Extended, _layer.State.Bits);
+    }
+
+    internal void RemoveLayerKey(LayerKey key)
+    {
+        LayerKeys.Remove(_editor.Layout, key);
+        Message = $"{LayerKeyRowViewModel.KeyName(key.ScanCode, key.Extended)} is a normal key again. The {key.LayerName} characters are kept; remove the column below if you don't need them.";
+        _editor.LayoutChangedExternally();
     }
 
     public ObservableCollection<ShiftColumnViewModel> Columns { get; } = [];
@@ -65,6 +136,8 @@ public sealed class ShiftStatesViewModel : ObservableObject
         {
             if (layout.Modifiers.StatesOf(c).Count > 0) Columns.Add(new ShiftColumnViewModel(this, layout, c));
         }
+        LayerKeyRows.Clear();
+        foreach (var k in LayerKeys.Find(layout)) LayerKeyRows.Add(new LayerKeyRowViewModel(this, k));
     }
 
     private void Add()

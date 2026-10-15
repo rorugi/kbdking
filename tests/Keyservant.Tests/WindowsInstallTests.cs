@@ -39,12 +39,16 @@ public partial class WindowsInstallTests
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool UnloadKeyboardLayout(nint hkl);
 
+    [LibraryImport("user32.dll", EntryPoint = "MapVirtualKeyExW")]
+    private static partial uint MapVirtualKeyEx(uint code, uint mapType, nint hkl);
+
     [LibraryImport("user32.dll", EntryPoint = "ToUnicodeEx")]
     private static unsafe partial int ToUnicodeEx(uint vk, uint scanCode, byte* keyState, char* buffer, int bufferSize, uint flags, nint hkl);
 
-    private static unsafe (int Result, string Text) Press(nint hkl, byte vk, ShiftState state, bool capsLock)
+    private static unsafe (int Result, string Text) Press(nint hkl, byte vk, ShiftState state, bool capsLock, byte heldKey = 0)
     {
         var keyState = stackalloc byte[256];
+        if (heldKey != 0) keyState[heldKey] = 0x80;
         if (state.Bits.HasFlag(ModifierBits.Shift)) keyState[0x10] = 0x80;
         if (state.Bits.HasFlag(ModifierBits.Ctrl)) keyState[0x11] = keyState[0xA2] = 0x80;
         if (state.Bits.HasFlag(ModifierBits.Alt)) keyState[0x12] = keyState[0xA5] = 0x80;
@@ -200,5 +204,44 @@ public partial class WindowsInstallTests
         })!;
         p.WaitForExit();
         return p.ExitCode == 0;
+    }
+
+    [WindowsInstallFact]
+    public void Layer_keys_and_qwerty_shortcuts_work_through_windows()
+    {
+        var layout = TestLayouts.Layered();
+        layout.Metadata.DllName = "kbdkslyr";
+        layout.Metadata.Name = "Keyservant layer test";
+        Core.Editing.ShortcutPositions.Apply(layout, Core.Editing.ShortcutMode.Qwerty);
+        var layerVk = Core.Editing.LayerKeys.Find(layout).First(k => k.Layer == ModifierBits.LayerA).VirtualKey;
+        var system = new WindowsLayoutSystem();
+        var installed = system.Install(LayoutPackage.Create(layout, LayoutDllBuilder.Build(layout)));
+        try
+        {
+            var hkl = LoadKeyboardLayout(installed.Klid, KlfNotEllShell);
+            Assert.NotEqual(0, hkl);
+            try
+            {
+                // Caps Lock sends the layer key's virtual key; holding it types the Greek layer.
+                Assert.Equal(layerVk, MapVirtualKeyEx(0x3A, 1 /* MAPVK_VSC_TO_VK */, hkl));
+                Flush(hkl);
+                Assert.Equal("α", Press(hkl, (byte)'A', ShiftState.Base, false, layerVk).Text);
+                Assert.Equal("Α", Press(hkl, (byte)'A', ShiftState.Shift, false, layerVk).Text);
+                Assert.Equal("a", Press(hkl, (byte)'A', ShiftState.Base, false).Text);
+
+                // QWERTY shortcuts: the key next to T sends VK_Y (Ctrl+Y there) but still types z.
+                Assert.Equal((uint)'Y', MapVirtualKeyEx(0x15, 1, hkl));
+                Assert.Equal("z", Press(hkl, (byte)'Y', ShiftState.Base, false).Text);
+                Assert.Equal("\u0019", Press(hkl, (byte)'Y', ShiftState.Ctrl, false).Text);
+            }
+            finally
+            {
+                UnloadKeyboardLayout(hkl);
+            }
+        }
+        finally
+        {
+            system.Uninstall(installed.Klid);
+        }
     }
 }

@@ -72,6 +72,10 @@ public sealed partial class EditorView : UserControl
         if (e.Handled && sender is TextBox box) box.SelectionStart = box.Text.Length;
     }
 
+    /// <summary>Layer keys work while held, so the preview also needs to know when they are released.</summary>
+    private void Preview_PreviewKeyUp(object sender, KeyRoutedEventArgs e) =>
+        e.Handled = ViewModel.HandlePreviewKeyUp((int)e.KeyStatus.ScanCode, e.KeyStatus.IsExtendedKey);
+
     // ---------------------------------------------------------------- Unicode picker
 
     /// <summary>Opens the character search next to a field; the picked character goes into that field.</summary>

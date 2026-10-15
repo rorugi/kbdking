@@ -281,4 +281,43 @@ public partial class PresentationTests
         await WaitUntil(() => privileged.Calls.Count > 0);
         Assert.Contains("keep A0010407", privileged.Calls);
     }
+
+    [Fact]
+    public void Shortcut_mode_moves_virtual_keys_and_undoes()
+    {
+        var editor = NewEditor(); // German (Austria): letters and QWERTZ positions coincide
+        Assert.Equal(Core.Editing.ShortcutMode.FollowLetters, editor.SelectedShortcutMode!.Mode);
+        Assert.Contains("QWERTZ", editor.ShortcutSummary);
+
+        editor.SelectedShortcutMode = editor.ShortcutModes.First(m => m.Mode == Core.Editing.ShortcutMode.Qwerty);
+        Assert.Equal(Core.Editing.ShortcutMode.Qwerty, editor.SelectedShortcutMode!.Mode);
+        Assert.Equal((byte)'Y', editor.Layout.ScanCodes[0x15].VirtualKey);
+        Assert.Equal("z", editor.KeyboardRows.SelectMany(r => r.Keys).First(k => k.Key.ScanCode == 0x15 && !k.Key.Extended).Label);
+
+        editor.UndoCommand.Execute(null);
+        Assert.Equal((byte)'Z', editor.Layout.ScanCodes[0x15].VirtualKey);
+    }
+
+    [Fact]
+    public void Layer_keys_can_be_added_and_typed_in_the_preview()
+    {
+        var editor = NewEditor();
+        editor.ShiftStateEditor.AddLayerKey(0x3A, false, ModifierBits.LayerA);
+        Assert.Single(editor.ShiftStateEditor.LayerKeyRows);
+        Assert.Contains(editor.ShiftStates, s => s.State.Bits == ModifierBits.LayerA);
+        Assert.Equal("Layer A", editor.KeyboardRows.SelectMany(r => r.Keys).First(k => k.Key.ScanCode == 0x3A).Label);
+
+        Key(editor, (byte)'A').SelectCommand.Execute(null);
+        editor.KeyEditor!.Rows.First(r => r.State.Bits == ModifierBits.LayerA).Text = "α";
+
+        editor.HandlePreviewKey(0x3A, false, false, false, false, capsLock: true); // hold the layer key
+        editor.HandlePreviewKey(0x1E, false, false, false, false, capsLock: true);
+        Assert.True(editor.HandlePreviewKeyUp(0x3A, false));
+        editor.HandlePreviewKey(0x1E, false, false, false, false, capsLock: true);
+        Assert.Equal("αa", editor.PreviewText); // Caps Lock is a layer key now, so the PC's Caps Lock is ignored
+
+        editor.ShiftStateEditor.LayerKeyRows[0].RemoveCommand.Execute(null);
+        Assert.Empty(editor.ShiftStateEditor.LayerKeyRows);
+        Assert.Contains(editor.Issues, i => i.Code == "KS090");
+    }
 }

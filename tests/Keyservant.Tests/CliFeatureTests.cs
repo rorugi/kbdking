@@ -104,4 +104,27 @@ public sealed partial class CliTests
         Assert.Equal(0, Run("package", file, "--wix", P("wix")).Code);
         Assert.Contains("<Package", File.ReadAllText(P("wix/Package.wxs")));
     }
+
+    [Fact]
+    public void Shortcuts_and_layers_commands()
+    {
+        var file = Sample();
+        var (code, output) = Run("shortcuts", file);
+        Assert.Equal(0, code);
+        Assert.Contains("QWERTZ", output);
+        Assert.Equal(0, Run("shortcuts", file, "qwerty").Code);
+        Assert.Contains("QWERTY", Run("shortcuts", file).Output);
+        Assert.Equal(2, Run("shortcuts", file, "dvorak").Code);
+
+        Assert.Equal(0, Run("layers", file, "add", "3A", "A").Code);
+        Assert.Equal(0, Run("layers", file, "add", "E05D", "B").Code);
+        (code, output) = Run("layers", file);
+        Assert.Equal(0, code);
+        Assert.Contains("Layer A", output);
+        Assert.Contains("E0 5D", output);
+        Assert.Equal(0, Run("layers", file, "remove", "E05D").Code);
+        Assert.Equal(2, Run("layers", file, "remove", "E05D").Code);
+        Assert.Equal(1, Run("layers", file, "add", "E038", "A").Code); // right Alt is AltGr here
+        Assert.Equal(0, Run("build", file, "-o", P("layered")).Code);
+    }
 }

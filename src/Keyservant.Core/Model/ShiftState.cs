@@ -15,6 +15,12 @@ public enum ModifierBits : byte
     Roya = 0x10,
     Loya = 0x20,
     GrpSelTap = 0x80,
+    /// <summary>A custom layer key (kbd.h KBDROYA, free for other uses outside Japanese thumb-shift layouts).</summary>
+    LayerA = Roya,
+    /// <summary>A custom layer key (kbd.h KBDLOYA).</summary>
+    LayerB = Loya,
+    /// <summary>A custom layer key (the unnamed kbd.h bit 0x40).</summary>
+    LayerC = 0x40,
     AltGr = Ctrl | Alt,
 }
 
@@ -50,11 +56,10 @@ public readonly record struct ShiftState(ModifierBits Bits) : IComparable<ShiftS
                 if (b.HasFlag(ModifierBits.Alt)) Add("alt");
             }
             if (b.HasFlag(ModifierBits.Kana)) Add("kana");
-            if (b.HasFlag(ModifierBits.Roya)) Add("roya");
-            if (b.HasFlag(ModifierBits.Loya)) Add("loya");
+            if (b.HasFlag(ModifierBits.LayerA)) Add("layer-a");
+            if (b.HasFlag(ModifierBits.LayerB)) Add("layer-b");
+            if (b.HasFlag(ModifierBits.LayerC)) Add("layer-c");
             if (b.HasFlag(ModifierBits.GrpSelTap)) Add("grpseltap");
-            var unknown = (byte)b & 0x40;
-            if (unknown != 0) Add("0x40");
             return sb.ToString();
         }
     }
@@ -66,6 +71,9 @@ public readonly record struct ShiftState(ModifierBits Bits) : IComparable<ShiftS
         {
             "altgr" => "AltGr",
             "ctrl" => "Ctrl",
+            "layer-a" => "Layer A",
+            "layer-b" => "Layer B",
+            "layer-c" => "Layer C",
             _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(p),
         }));
 
@@ -94,10 +102,11 @@ public readonly record struct ShiftState(ModifierBits Bits) : IComparable<ShiftS
                 case "alt": bits |= ModifierBits.Alt; break;
                 case "altgr": bits |= ModifierBits.AltGr; break;
                 case "kana": bits |= ModifierBits.Kana; break;
-                case "roya": bits |= ModifierBits.Roya; break;
-                case "loya": bits |= ModifierBits.Loya; break;
+                case "roya" or "layer-a" or "layera": bits |= ModifierBits.LayerA; break;
+                case "loya" or "layer-b" or "layerb": bits |= ModifierBits.LayerB; break;
+                case "layer-c" or "layerc": bits |= ModifierBits.LayerC; break;
                 case "grpseltap": bits |= ModifierBits.GrpSelTap; break;
-                case "0x40": bits |= (ModifierBits)0x40; break;
+                case "0x40": bits |= ModifierBits.LayerC; break;
                 default: return false;
             }
         }

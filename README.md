@@ -17,6 +17,11 @@ app with nothing running in the background. Free and open source (MIT).
   key, including characters outside the BMP) with their own list, Caps Lock behaviour and SGCAPS, key
   names, a low-level scan-code editor, **undo/redo**, and a live preview that types with the layout you
   are editing before you install it.
+- **Shortcuts stay in place**: one setting keeps Ctrl+C, Ctrl+V, Ctrl+Z… at their QWERTY (or QWERTZ,
+  AZERTY) positions while the keys type Colemak, Dvorak, Neo or your own arrangement.
+- **Layer keys**: turn Caps Lock, the < > key, Menu or any other key into an extra Shift that switches to
+  a layer of your own (Greek, symbols, IAST…), up to three layers, each also with Shift. Built into the
+  layout, no background program.
 - **Unicode picker**: find any character by name (“a macron”, “dot below”), by code or by pasting it.
   Works offline (Unicode 15.1 names are built in).
 - **Placement assistant**: give it the characters you need (or a sample text) and it proposes dead keys for
@@ -64,6 +69,8 @@ keyservant convert my-layout.keyservant my-layout.keylayout      # macOS; .xkb f
 keyservant package my-layout.keyservant --msi my-layout.msi       # needs WiX: dotnet tool install -g wix
 keyservant package my-layout.keyservant --intune intune-folder
 keyservant unicode a macron
+keyservant shortcuts colemak.keyservant qwerty                    # Ctrl+C/V/Z stay at QWERTY positions
+keyservant layers my-layout.keyservant add 3A A                  # Caps Lock selects Layer A while held
 ```
 
 Also: `templates`, `build` (DLLs only), `enable`/`disable` (switcher), `import` (save an installed layout

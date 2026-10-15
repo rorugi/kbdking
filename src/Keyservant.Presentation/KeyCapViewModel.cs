@@ -61,6 +61,15 @@ public sealed class KeyCapViewModel : ObservableObject
         IsCharacterKey = VirtualKey is { } v && Key.FixedLabel is null && !VirtualKeys.IsImplicitControlKey(v);
 
         IsHighlighted = VirtualKey is { } hv && _editor.HighlightedKeys.Contains(hv);
+        var layer = VirtualKey is { } lv ? layout.Modifiers.VkToBits.FirstOrDefault(b => b.VirtualKey == lv && (b.Bits & (ModifierBits.LayerA | ModifierBits.LayerB | ModifierBits.LayerC)) != 0) : default;
+        if (layer.Bits != ModifierBits.None)
+        {
+            IsCharacterKey = false;
+            Label = new ShiftState(layer.Bits).DisplayName;
+            ShiftLabel = "";
+            IsDead = false;
+            return;
+        }
         if (Key.FixedLabel is not null || def is null)
         {
             Label = Key.FixedLabel switch

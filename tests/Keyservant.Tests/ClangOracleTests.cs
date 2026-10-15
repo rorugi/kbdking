@@ -95,4 +95,15 @@ public class ClangOracleTests
         layout.Tests.Clear(); // tests live only in the .keyservant file, not in the DLL
         AssertSameAsCompiler(layout);
     }
+
+    [ClangFact]
+    public void Layer_keys_match_the_compiler() => AssertSameAsCompiler(TestLayouts.Layered());
+
+    [ClangFact]
+    public void Qwerty_shortcuts_on_colemak_match_the_compiler()
+    {
+        var layout = TestLayouts.Colemak();
+        Core.Editing.ShortcutPositions.Apply(layout, Core.Editing.ShortcutMode.Qwerty);
+        AssertSameAsCompiler(layout);
+    }
 }

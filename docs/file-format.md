@@ -76,8 +76,37 @@ Comments (`//`, `/* */`) and trailing commas are accepted when reading; Keyserva
 modifier combinations is written as an array, e.g. `["altgr", "alt"]`; keys store their characters under
 the first name.
 
-Shift state names combine `shift`, `ctrl`, `alt`, `altgr` (= `ctrl+alt`), `kana`, `roya`, `loya` and
-`grpseltap` with `+`; `base` means no modifier.
+Shift state names combine `shift`, `ctrl`, `alt`, `altgr` (= `ctrl+alt`), `kana`, `layer-a`, `layer-b`,
+`layer-c` and `grpseltap` with `+`; `base` means no modifier. (`roya` and `loya`, the kbd.h names of the
+Layer A and B bits, are still read.)
+
+### Layer keys
+
+A layer key is a physical key that selects extra columns while held. It needs three entries: the key's
+scan code sends a free virtual key, `vkToBits` maps that virtual key to a layer bit, and `columns` has the
+layer states:
+
+```json
+"modifiers": {
+  "vkToBits": {"SHIFT": "shift", "CONTROL": "ctrl", "MENU": "alt", "0x97": "layer-a"},
+  "columns": ["base", "shift", "ctrl", "shift+ctrl", "altgr", "layer-a", "shift+layer-a"],
+  "maxModBits": 17
+},
+"scanCodes": {"normal": {"3A": "0x97"}},
+"keys": [{"vk": "A", "base": "a", "shift": "A", "layer-a": "α", "shift+layer-a": "Α"}]
+```
+
+`keyservant layers <file> add 3A A` (or the app's Shift states tab) writes all of this. In tests, layers
+are written `LayerA+a`.
+
+### Shortcut positions
+
+Apps recognise shortcuts such as Ctrl+C by virtual key. Which physical key sends `VK_C` is decided by
+`scanCodes`, independently of what the key types. Normally letter keys send the virtual key of their letter
+(shortcuts follow the letters). `keyservant shortcuts <file> qwerty` (or the Layout tab) instead gives the
+letter positions of a US keyboard their US virtual keys, moving each key's characters along, so Ctrl+C/V/X/Z
+stay under the same fingers on Colemak, Dvorak, Neo and the like. `qwertz`, `azerty` and `letters` work the
+same way. Nothing is stored besides the resulting `scanCodes` and `keys`.
 
 ## scanCodes
 
