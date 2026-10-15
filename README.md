@@ -8,6 +8,16 @@ app with nothing running in the background. Free and open source (MIT).
 > tested; the Windows app and the installer are first versions that still need testing on real PCs.
 > See [Status](#status) before using it on a machine you care about.
 
+## Install
+
+Download the newest installer from [**Releases → latest**](https://github.com/rorugi/keyservant/releases/tag/latest):
+`Keyservant-x64.msi` (or `Keyservant-arm64.msi` for Windows on ARM) and run it. It installs Keyservant for all users,
+adds it to the Start menu and puts the `keyservant` command on the PATH; uninstall it in Settings → Apps. Every
+change on `main` builds a new one. The installer isn't signed yet, so Windows may say it doesn't know the publisher:
+choose *More info → Run anyway*.
+
+To build the installer yourself: `.\tools\build-installer.ps1` (writes `artifacts\Keyservant-x64.msi`).
+
 ## Features
 
 - **Layout manager**: list every layout on the PC, add or remove it from the Win+Space switcher with a

@@ -200,3 +200,86 @@ jobs:
           }
           Write-Output "::notice title=App start::The app was still running after 20 seconds."
           Stop-Process -Id $p.Id -Force
+
+  installer:
+    name: Windows installer (${{ matrix.arch }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build the MSI
+        shell: pwsh
+        run: ./tools/build-installer.ps1 -Arch ${{ matrix.arch }} -Version "0.1.${{ github.run_number }}"
+
+      # Installs the MSI like a user would, checks that the app starts from Program Files and the CLI is
+      # there, then uninstalls it again. ARM64 can only be built here, not run.
+      - name: Install, start and uninstall
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        env:
+          KEYSERVANT_NO_DIALOGS: "1"
+        run: |
+          $msi = (Resolve-Path artifacts/Keyservant-x64.msi).Path
+          $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$msi`"", '/qn', '/l*v', 'install.log' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 40; exit 1 }
+          $dir = Join-Path $env:ProgramFiles 'Keyservant'
+          foreach ($f in 'Keyservant.App.exe', 'keyservant.exe', 'Keyservant.App.pri') {
+            if (-not (Test-Path (Join-Path $dir $f))) { Write-Output "::error title=Installer::$f is missing in $dir"; exit 1 }
+          }
+          & (Join-Path $dir 'keyservant.exe') templates
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $app = Start-Process -FilePath (Join-Path $dir 'Keyservant.App.exe') -PassThru
+          Start-Sleep -Seconds 20
+          $app.Refresh()
+          if ($app.HasExited) {
+            $log = Join-Path $env:LOCALAPPDATA 'Keyservant\crash.log'
+            $details = if (Test-Path $log) { (Get-Content $log -Raw) -replace '%','%25' -replace "`r",'' -replace "`n",'%0A' } else { '' }
+            Write-Output "::error title=Installed app::exited with $($app.ExitCode)%0A$details"
+            exit 1
+          }
+          Stop-Process -Id $app.Id -Force
+          $p = Start-Process msiexec.exe -ArgumentList '/x', "`"$msi`"", '/qn' -Wait -PassThru
+          if ($p.ExitCode -ne 0 -or (Test-Path (Join-Path $dir 'Keyservant.App.exe'))) { Write-Output '::error title=Installer::uninstall failed'; exit 1 }
+          Write-Output "::notice title=Installer::Installed, started and uninstalled Keyservant 0.1.${{ github.run_number }}."
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: keyservant-installer-${{ matrix.arch }}
+          path: artifacts/Keyservant-${{ matrix.arch }}.msi
+
+  # Every push to main updates the "latest" pre-release, so the newest installer is always at
+  # https://github.com/rorugi/keyservant/releases/tag/latest
+  latest:
+    name: Publish latest installers
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [linux, windows, arm64, app, installer]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: latest-release
+      cancel-in-progress: true
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: keyservant-installer-*
+          merge-multiple: true
+          path: dist
+
+      - name: Update the "latest" pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest dist/*.msi --prerelease --target "${{ github.sha }}" \
+            --title "Latest build (0.1.${{ github.run_number }})" \
+            --notes "Automatic build of the newest commit on main (${GITHUB_SHA::7}). Not signed yet: Windows may warn that it doesn't know the publisher; choose More info → Run anyway. Download Keyservant-x64.msi (or Keyservant-arm64.msi for Windows on ARM) and run it."

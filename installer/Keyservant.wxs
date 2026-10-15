@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Windows installer (MSI) for the Keyservant app. Built by tools/build-installer.ps1:
+    wix build installer/Keyservant.wxs -arch x64 -d PublishDir=<published app> -d Version=0.1.42 -o Keyservant-x64.msi
+  Installs for all users into Program Files\Keyservant, adds a Start menu entry and puts keyservant.exe on the PATH.
+  Upgrades replace older versions; uninstall from Settings > Apps.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="Keyservant"
+      Manufacturer="Keyservant contributors"
+      Version="$(var.Version)"
+      UpgradeCode="85564B4F-6DA4-4524-A83B-03F85A441A6E"
+      Scope="perMachine"
+      Compressed="yes"
+      Language="1033">
+    <SummaryInformation Description="Keyservant: create, edit and install Windows keyboard layouts" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Keyservant is already installed." AllowSameVersionUpgrades="yes" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/rorugi/keyservant" />
+    <Property Id="ARPCOMMENTS" Value="Create, edit and install Windows keyboard layouts." />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="Keyservant">
+        <!-- Everything the app and the CLI publish into one folder. -->
+        <Files Include="$(var.PublishDir)\**" />
+
+        <Component Id="CliOnPath" Guid="0E6F2C3B-7D4A-4E59-9C61-3A8B2F4D5E71">
+          <Environment Id="KeyservantPath" Name="PATH" Value="[INSTALLFOLDER]" Part="last" System="yes" Action="set" Permanent="no" />
+          <RegistryValue Root="HKLM" Key="Software\Keyservant" Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Guid="4C1B9E2A-58D3-4F07-B6A2-91E3C7D04F58">
+        <Shortcut Id="KeyservantShortcut" Name="Keyservant" Description="Create, edit and install keyboard layouts"
+                  Target="[INSTALLFOLDER]Keyservant.App.exe" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKLM" Key="Software\Keyservant" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+  </Package>
+</Wix>

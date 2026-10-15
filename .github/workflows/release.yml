@@ -65,6 +65,12 @@ jobs:
           wait-for-completion: true
           output-artifact-directory: dist
 
+      - name: Build the installers (MSI)
+        shell: pwsh
+        run: |
+          ./tools/build-installer.ps1 -Arch x64 -Version "${{ steps.version.outputs.version }}"
+          ./tools/build-installer.ps1 -Arch arm64 -Version "${{ steps.version.outputs.version }}"
+
       - name: Zip
         shell: pwsh
         run: |
@@ -74,4 +80,4 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" "Keyservant-${{ steps.version.outputs.version }}-win-x64.zip" "Keyservant-${{ steps.version.outputs.version }}-win-arm64.zip" --title "Keyservant ${{ steps.version.outputs.version }}" --generate-notes
+        run: gh release create "${{ github.ref_name }}" "Keyservant-${{ steps.version.outputs.version }}-win-x64.zip" "Keyservant-${{ steps.version.outputs.version }}-win-arm64.zip" artifacts/Keyservant-x64.msi artifacts/Keyservant-arm64.msi --title "Keyservant ${{ steps.version.outputs.version }}" --generate-notes
