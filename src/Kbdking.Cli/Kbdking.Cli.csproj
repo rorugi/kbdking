@@ -5,6 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Kbdking.Cli</RootNamespace>
     <AssemblyName>kbdking</AssemblyName>
+    <ApplicationIcon>..\Kbdking.App\Assets\kbdking.ico</ApplicationIcon>
     <Description>Command-line interface: create, convert, validate, build, package, install and manage keyboard layouts.</Description>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using Kbdking.Core.Model;
 
 namespace Kbdking.Core.Analysis;
@@ -29,9 +31,22 @@ public sealed class KeystrokeFinder
     /// <summary>Every text the layout can type in at most six strokes.</summary>
     public IReadOnlyDictionary<string, TypingRecipe> All => _best;
 
-    public TypingRecipe? Find(string text) => _best.GetValueOrDefault(text);
+    /// <summary>
+    /// The cheapest way to type <paramref name="text"/>. Characters Unicode has no single code point for (r̥, l̥̄)
+    /// can also be typed as the letter followed by keys that type the combining marks.
+    /// </summary>
+    public TypingRecipe? Find(string text)
+    {
+        if (_best.TryGetValue(text, out var recipe)) return recipe;
+        if (text.Length < 2 || !IsCombiningMark(text[^1]) || !text.IsNormalized(NormalizationForm.FormC)) return null;
+        if (Find(text[..^1]) is not { } head || _best.GetValueOrDefault(text[^1..]) is not { } mark) return null;
+        return new TypingRecipe([.. head.Strokes, .. mark.Strokes], head.Effort + mark.Effort);
+    }
 
-    public bool CanType(string text) => _best.ContainsKey(text);
+    public bool CanType(string text) => Find(text) is not null;
+
+    private static bool IsCombiningMark(char c) =>
+        CharUnicodeInfo.GetUnicodeCategory(c) is UnicodeCategory.NonSpacingMark or UnicodeCategory.EnclosingMark;
 
     private void Explore()
     {

@@ -1,3 +1,5 @@
+<img src="assets/logo.png" alt="kbdking logo" width="96" align="right">
+
 # kbdking
 
 kbdking creates, edits and installs Windows keyboard layouts. It imports an existing layout, lets you
@@ -153,6 +155,11 @@ Not yet checked by hand: typing in real apps (Notepad, a 32-bit app, x64 apps em
 app's UI and the installer.
 If you try them, please report what happened in an issue.
 
+## Author
+
+kbdking is made by Roland Russwurm. It was developed with the help of AI: much of the code and documentation
+was written with Claude Code (Anthropic) and reviewed and tested by its author and the automated tests.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -165,4 +172,4 @@ Free code signing provided by [SignPath.io](https://about.signpath.io), certific
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE), © 2026 Roland Russwurm

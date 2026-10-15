@@ -23,6 +23,14 @@ public sealed record ComposeCompilation(KeyboardLayout Layout, IReadOnlyList<str
 /// </remarks>
 public static class ComposeCompiler
 {
+    internal const int CopilotScanCode = 0x6E;
+
+    /// <summary>Windows can catch the Copilot key before any keyboard layout sees it.</summary>
+    public const string CopilotWarning =
+        "Windows may still open Copilot with the Copilot key, because it handles that key before keyboard layouts do. " +
+        "If it does: in Settings > Bluetooth & devices > Keyboard, set the Copilot key to \"Right Ctrl\" and choose Right Ctrl " +
+        "as the compose key here (or \"Context menu\" and the Menu key). That setting comes with the Windows 11 update of October 2026.";
+
     private static readonly byte[] CandidateVks = [0xDF, 0xE1, 0xE3, 0xE4, 0xE6, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0x92, 0x93, 0x94, 0x95, 0x96];
 
     private const char FirstStateAccent = '';
@@ -61,6 +69,7 @@ public static class ComposeCompiler
             else if (layout.FindKey(previous.VirtualKey) is { IsEmpty: false } typed && !VirtualKeys.IsImplicitControlKey(previous.VirtualKey))
                 warnings.Add($"The compose key ({compose.KeyText}) typed characters before (virtual key {typed.Name}); they can no longer be typed.");
         }
+        if (!compose.Extended && compose.ScanCode == CopilotScanCode) warnings.Add(CopilotWarning);
         if (layout.FindDeadKey(compose.Accent) is not null || layout.Keys.Any(k => k.Outputs.Values.Any(o => o.Text.Contains(compose.Accent))))
             errors.Add($"The compose accent '{compose.Accent}' (U+{(int)compose.Accent:X4}) is already used by the layout. Pick a character the layout doesn't type.");
         if (errors.Count > 0) return new ComposeCompilation(layout, warnings, errors);

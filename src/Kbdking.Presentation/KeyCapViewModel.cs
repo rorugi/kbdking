@@ -12,7 +12,7 @@ public sealed class KeyCapViewModel : ObservableObject
 
     private readonly EditorViewModel _editor;
     private string _label = "";
-    private string _shiftLabel = "";
+    private string _cornerLabel = "";
     private bool _isDead;
     private bool _isSelected;
     private bool _isHighlighted;
@@ -34,8 +34,11 @@ public sealed class KeyCapViewModel : ObservableObject
     /// <summary>What the key types in the selected shift state, or its name for keys like Shift.</summary>
     public string Label { get => _label; private set => SetProperty(ref _label, value); }
 
-    /// <summary>What the key types with Shift, shown small in the corner.</summary>
-    public string ShiftLabel { get => _shiftLabel; private set => SetProperty(ref _shiftLabel, value); }
+    /// <summary>
+    /// Shown small in the corner: in the base state what the key types with Shift; in other states the key's
+    /// own letter (what it types without modifiers), so the key stays recognisable.
+    /// </summary>
+    public string CornerLabel { get => _cornerLabel; private set => SetProperty(ref _cornerLabel, value); }
 
     public bool IsDead { get => _isDead; private set => SetProperty(ref _isDead, value); }
 
@@ -66,7 +69,7 @@ public sealed class KeyCapViewModel : ObservableObject
         {
             IsCharacterKey = false;
             Label = new ShiftState(layer.Bits).DisplayName;
-            ShiftLabel = "";
+            CornerLabel = "";
             IsDead = false;
             return;
         }
@@ -78,7 +81,7 @@ public sealed class KeyCapViewModel : ObservableObject
                 { } fixedLabel => fixedLabel,
                 null => "",
             };
-            ShiftLabel = "";
+            CornerLabel = "";
             IsDead = false;
             return;
         }
@@ -87,8 +90,15 @@ public sealed class KeyCapViewModel : ObservableObject
         var output = canonical is { } c ? def.Outputs.GetValueOrDefault(c) : null;
         Label = Display(output);
         IsDead = output?.IsDead ?? false;
-        ShiftLabel = state.Bits == ModifierBits.None ? Display(def.Outputs.GetValueOrDefault(ShiftState.Shift)) : "";
+        CornerLabel = state.Bits == ModifierBits.None ? Display(def.Outputs.GetValueOrDefault(ShiftState.Shift)) : KeyName(def);
         OnPropertyChanged(nameof(ToolTip));
+    }
+
+    /// <summary>The key's own character as printed on keyboards: "A" for the a key, "1" for the 1 key.</summary>
+    private static string KeyName(KeyDefinition def)
+    {
+        var label = Display(def.Outputs.GetValueOrDefault(ShiftState.Base));
+        return label.Length == 1 && char.IsLower(label[0]) ? label.ToUpperInvariant() : label;
     }
 
     /// <summary>Formats an output for a key cap: control characters as U+XXXX, combining marks on a dotted circle.</summary>

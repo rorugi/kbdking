@@ -5,6 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Kbdking.Stub</RootNamespace>
     <AssemblyName>Kbdking.Stub</AssemblyName>
+    <ApplicationIcon>..\Kbdking.App\Assets\kbdking.ico</ApplicationIcon>
     <Description>Standalone layout installer. kbdking appends a layout package to a copy of this executable.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Published as a single native executable that needs no .NET runtime on the target PC. -->

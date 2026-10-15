@@ -16,6 +16,8 @@ public enum PlannedChangeKind
     DeadKeyEntries,
     /// <summary>Two dead keys chained for characters with two marks, e.g. dot below + macron → ṝ.</summary>
     Chain,
+    /// <summary>A combining mark on a key, typed after the letter, for characters Unicode has no single code point for (r̥).</summary>
+    CombiningKey,
 }
 
 /// <summary>One proposed change. <see cref="Apply"/> performs it on a layout.</summary>
@@ -121,12 +123,19 @@ public static class PlacementPlanner
         var singles = new Dictionary<char, List<(string Char, char Base)>>();
         var chains = new Dictionary<(char, char), List<(string Char, char Base)>>();
         var direct = new List<string>();
+        var combining = new List<string>();
         foreach (var c in wanted)
         {
             if (finder.CanType(c)) { plan.AlreadyTypeable.Add(c); continue; }
             var d = c.Normalize(NormalizationForm.FormD);
             var marks = d.Skip(1).ToArray();
             var baseOk = d.Length > 0 && !char.IsSurrogate(d[0]) && FindBaseKey(work, d[0]) is not null;
+            if (c.Length > 1 && marks.Length > 0 && baseOk && marks.All(Marks.ContainsKey))
+            {
+                // No single code point exists (r̥, l̥̄): typed as the letter followed by combining marks.
+                combining.Add(c);
+                continue;
+            }
             if (c.Length != 1 || marks.Length == 0 || !baseOk || marks.Any(m => !Marks.ContainsKey(m)) || marks.Length > 2)
             {
                 direct.Add(c);
@@ -231,6 +240,28 @@ public static class PlacementPlanner
                         foreach (var (ch, b) in items) if (state.Find(b) is null) state.Set(b, ch[0]);
                     }
                 })));
+        }
+
+        // Combining marks on keys, for characters without a code point of their own.
+        var marksNeeded = combining.SelectMany(c => c.Normalize(NormalizationForm.FormD).Skip(1)).Distinct().ToList();
+        foreach (var mark in marksNeeded)
+        {
+            var users = combining.Where(c => c.Normalize(NormalizationForm.FormD).Skip(1).Contains(mark)).ToList();
+            if (finder.CanType(mark.ToString())) continue; // the layout already has a key for this mark
+            var info = Marks[mark];
+            var slot = FindSlotForSymbols(work, info.PreferredKeys) ?? FindAnyFreeSlot(work, preferPunctuation: true);
+            if (slot is null)
+            {
+                foreach (var c in users.Where(u => !plan.NotPlaced.Any(n => n.Character == u))) plan.NotPlaced.Add((c, $"no free AltGr position left for a combining {info.Name}"));
+                continue;
+            }
+            var (vk, state) = slot.Value;
+            var label = KeySequence.Format([new KeyStroke(vk, state)], work);
+            var markText = mark.ToString();
+            plan.Changes.Add(Record(work, new PlannedChange(PlannedChangeKind.CombiningKey,
+                $"Combining {info.Name} on {label}, typed after the letter: {string.Join(" ", users)}",
+                [.. users],
+                l => { if (IsFree(l, vk, state)) l.SetOutput(vk, state, KeyOutput.Of(markText)); })));
         }
 
         // Frequent characters also get a direct key.

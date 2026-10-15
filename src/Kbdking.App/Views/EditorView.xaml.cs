@@ -51,6 +51,7 @@ public sealed partial class EditorView : UserControl
         _unicodeFlyout = CreateUnicodeFlyout();
         viewModel.Analysis.PropertyChanged += OnToolPropertyChanged;
         viewModel.Compare.PropertyChanged += OnToolPropertyChanged;
+        viewModel.TabRequested += (_, topic) => SelectTab(topic);
     }
 
     public EditorViewModel ViewModel { get; }
@@ -70,6 +71,22 @@ public sealed partial class EditorView : UserControl
         e.Handled = ViewModel.HandlePreviewKey((int)status.ScanCode, status.IsExtendedKey,
             Down(VirtualKey.Shift), Down(VirtualKey.Control), Down(VirtualKey.Menu), capsLock);
         if (e.Handled && sender is TextBox box) box.SelectionStart = box.Text.Length;
+    }
+
+    /// <summary>
+    /// The preview is editable only so it shows a cursor: text comes from the layout simulation alone, so
+    /// pasting, IME input or keys the simulation doesn't handle never change it.
+    /// </summary>
+    private void Preview_BeforeTextChanging(TextBox sender, TextBoxBeforeTextChangingEventArgs args)
+    {
+        static string Lines(string s) => s.Replace("\r\n", "\r", StringComparison.Ordinal).Replace('\n', '\r');
+        if (Lines(args.NewText) != Lines(ViewModel.PreviewText)) args.Cancel = true;
+    }
+
+    /// <summary>Keeps the cursor after the last character typed.</summary>
+    private void Preview_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (sender is TextBox box) box.SelectionStart = box.Text.Length;
     }
 
     /// <summary>Layer keys work while held, so the preview also needs to know when they are released.</summary>
@@ -99,6 +116,21 @@ public sealed partial class EditorView : UserControl
         if (TabInfo is null) return;
         var topic = EditorTabs?.SelectedItem?.Tag as string ?? "tab-keys";
         TabInfo.Topic = topic == "advanced" ? AdvancedTabs?.SelectedItem?.Tag as string ?? "tab-shiftstates" : topic;
+    }
+
+    /// <summary>Shows the tab with this topic id (e.g. "tab-deadkeys"), also inside Advanced.</summary>
+    internal void SelectTab(string topic)
+    {
+        foreach (var (bar, parent) in new[] { (EditorTabs, (string?)null), (AdvancedTabs, "advanced") })
+        {
+            if (bar.Items.FirstOrDefault(i => i.Tag as string == topic) is not { } item) continue;
+            if (parent is not null) EditorTabs.SelectedItem = EditorTabs.Items.First(i => i.Tag as string == parent);
+            bar.SelectedItem = item;
+            ShowSelectedPages();
+            if (topic == "tab-deadkeys" && ViewModel.DeadKeys.Selected is { } selected)
+                DispatcherQueue.TryEnqueue(() => DeadKeyList.ScrollIntoView(selected));
+            return;
+        }
     }
 
     // ---------------------------------------------------------------- Unicode picker

@@ -164,7 +164,7 @@
                                                             VerticalAlignment="Top"
                                                             FontSize="11"
                                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                            Text="{x:Bind ShiftLabel, Mode=OneWay}" />
+                                                            Text="{x:Bind CornerLabel, Mode=OneWay}" />
                                                         <TextBlock
                                                             HorizontalAlignment="Center"
                                                             VerticalAlignment="Center"
@@ -215,6 +215,7 @@
                                                 <ColumnDefinition Width="180" />
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock VerticalAlignment="Center" Text="{x:Bind StateName}" />
@@ -223,7 +224,14 @@
                                                 <FontIcon Glyph="&#xE721;" FontSize="14" />
                                             </Button>
                                             <CheckBox Grid.Column="3" Content="Dead key" IsChecked="{x:Bind IsDead, Mode=TwoWay}" />
-                                            <StackPanel Grid.Column="4" VerticalAlignment="Center">
+                                            <HyperlinkButton
+                                                Grid.Column="4"
+                                                Padding="4,2"
+                                                Content="Edit dead key ›"
+                                                Command="{x:Bind ShowDeadKeyCommand}"
+                                                ToolTipService.ToolTip="Show this dead key and its compositions on the Dead keys tab"
+                                                Visibility="{x:Bind local:Converters.VisibleIf(HasDeadKey), Mode=OneWay}" />
+                                            <StackPanel Grid.Column="5" VerticalAlignment="Center">
                                                 <TextBlock
                                                     Style="{StaticResource CaptionTextBlockStyle}"
                                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -251,7 +259,10 @@
                                 MinHeight="72"
                                 AcceptsReturn="True"
                                 Header="Try it: click here and type. Keystrokes use the layout you are editing, not the active Windows layout."
-                                IsReadOnly="True"
+                                IsSpellCheckEnabled="False"
+                                IsTextPredictionEnabled="False"
+                                BeforeTextChanging="Preview_BeforeTextChanging"
+                                TextChanged="Preview_TextChanged"
                                 PreviewKeyDown="Preview_PreviewKeyDown"
                                 PreviewKeyUp="Preview_PreviewKeyUp"
                                 LostFocus="Preview_LostFocus"
@@ -277,6 +288,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <ListView
+                            x:Name="DeadKeyList"
                             ItemsSource="{x:Bind ViewModel.DeadKeys.DeadKeys}"
                             SelectedItem="{Binding DeadKeys.Selected, Mode=TwoWay}">
                             <ListView.ItemTemplate>

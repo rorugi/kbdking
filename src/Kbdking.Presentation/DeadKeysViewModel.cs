@@ -158,6 +158,9 @@ public sealed class DeadKeysViewModel : ObservableObject
         Selected = DeadKeys.FirstOrDefault(d => d.AccentChar == selected) ?? DeadKeys.FirstOrDefault();
     }
 
+    /// <summary>Selects the dead key with this accent, if the layout has one.</summary>
+    internal void Select(char accent) => Selected = DeadKeys.FirstOrDefault(d => d.AccentChar == accent) ?? Selected;
+
     private void AddDeadKey()
     {
         if (!OutputRowViewModel.TryParse(_newAccent, out var accent) || accent.Length != 1) return;

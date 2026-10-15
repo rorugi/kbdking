@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Windows.Input;
 using Kbdking.Core.Model;
 
 namespace Kbdking.Presentation;
@@ -20,6 +21,7 @@ public sealed class OutputRowViewModel : ObservableObject, ICharacterTarget
         State = state;
         _text = output is null ? "" : Format(output.Text);
         _isDead = output?.IsDead ?? false;
+        ShowDeadKeyCommand = new RelayCommand(() => { if (DeadKeyAccent is { } accent) _editor.ShowDeadKey(accent); });
     }
 
     public ShiftState State { get; }
@@ -49,6 +51,14 @@ public sealed class OutputRowViewModel : ObservableObject, ICharacterTarget
 
     public string? Error { get => _error; private set => SetProperty(ref _error, value); }
 
+    /// <summary>True when this output is a valid dead key, so it can link to its entry on the Dead keys tab.</summary>
+    public bool HasDeadKey => DeadKeyAccent is not null;
+
+    /// <summary>Opens the Dead keys tab at this dead key.</summary>
+    public ICommand ShowDeadKeyCommand { get; }
+
+    private char? DeadKeyAccent => _isDead && TryParse(_text, out var s) && s.Length == 1 ? s[0] : null;
+
     /// <summary>Code points of the current text, e.g. "U+0101 LATIN SMALL LETTER A WITH MACRON" (name if known).</summary>
     public string CodePoints => Describe(_text);
 
@@ -66,6 +76,7 @@ public sealed class OutputRowViewModel : ObservableObject, ICharacterTarget
 
     private void Apply()
     {
+        OnPropertyChanged(nameof(HasDeadKey));
         if (!TryParse(_text, out var parsed))
         {
             Error = "Use characters, or codes like U+0101.";

@@ -9,7 +9,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
       Name="kbdking"
-      Manufacturer="kbdking contributors"
+      Manufacturer="Roland Russwurm"
       Version="$(var.Version)"
       UpgradeCode="85564B4F-6DA4-4524-A83B-03F85A441A6E"
       Scope="perMachine"
@@ -20,11 +20,15 @@
     <!-- Same UpgradeCode as the old "Keyservant" installer, so installing kbdking replaces it. -->
     <MediaTemplate EmbedCab="yes" />
 
+    <Icon Id="kbdking.ico" SourceFile="$(sys.SOURCEFILEDIR)..\src\Kbdking.App\Assets\kbdking.ico" />
+    <Property Id="ARPPRODUCTICON" Value="kbdking.ico" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/rorugi/kbdking" />
     <Property Id="ARPCOMMENTS" Value="Create, edit and install Windows keyboard layouts." />
 
     <!-- Setup screens: welcome + licence, progress, and a finish page that can start the app. -->
     <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)License.rtf" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(sys.SOURCEFILEDIR)dialog.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(sys.SOURCEFILEDIR)banner.bmp" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start kbdking now" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WixShellExecTarget" Value="[INSTALLFOLDER]Kbdking.App.exe" />
@@ -49,7 +53,7 @@
 
     <StandardDirectory Id="ProgramMenuFolder">
       <Component Id="StartMenuShortcut" Guid="22F7D322-39D6-4F3B-B72F-3A2FEFDED7E6">
-        <Shortcut Id="KbdkingShortcut" Name="kbdking" Description="Create, edit and install keyboard layouts"
+        <Shortcut Id="KbdkingShortcut" Name="kbdking" Description="Create, edit and install keyboard layouts" Icon="kbdking.ico"
                   Target="[INSTALLFOLDER]Kbdking.App.exe" WorkingDirectory="INSTALLFOLDER" />
         <RegistryValue Root="HKLM" Key="Software\kbdking" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
       </Component>

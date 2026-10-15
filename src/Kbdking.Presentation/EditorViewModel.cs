@@ -415,6 +415,16 @@ public sealed class EditorViewModel : ObservableObject
         KeyEditor = new KeyEditorViewModel(this, _layout, _layout.GetOrAddKey(vk), ShiftStates.Select(s => s.State));
     }
 
+    /// <summary>Asks the view to show another tab; the argument is the tab's topic id, e.g. "tab-deadkeys".</summary>
+    public event EventHandler<string>? TabRequested;
+
+    /// <summary>Shows the Dead keys tab with the dead key for <paramref name="accent"/> selected.</summary>
+    internal void ShowDeadKey(char accent)
+    {
+        DeadKeys.Select(accent);
+        TabRequested?.Invoke(this, "tab-deadkeys");
+    }
+
     internal void SetOutput(byte vk, ShiftState state, KeyOutput? output)
     {
         var columns = _layout.Modifiers.ColumnCount;

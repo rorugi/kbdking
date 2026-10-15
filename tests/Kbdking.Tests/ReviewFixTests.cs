@@ -157,7 +157,7 @@ public class FeatureFixTests
         layout.Compose.Extended = false;
         var compiled = ComposeCompiler.Compile(layout);
         Assert.Empty(compiled.Errors);
-        Assert.Empty(compiled.Warnings);
+        Assert.Equal(ComposeCompiler.CopilotWarning, Assert.Single(compiled.Warnings)); // Windows may catch the key first
         var sim = new TypingSimulator(compiled.Layout);
         Assert.Equal("", sim.PressScanCode(0x6E, false, ShiftState.Shift)); // the keyboard holds Shift (and Win)
         Assert.Equal("ṛ", sim.PressScanCode(0x34, false, ShiftState.Base) + sim.PressScanCode(0x13, false, ShiftState.Base));

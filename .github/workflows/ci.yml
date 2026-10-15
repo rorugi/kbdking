@@ -201,6 +201,68 @@ jobs:
           Write-Output "::notice title=App start::The app was still running after 20 seconds."
           Stop-Process -Id $p.Id -Force
 
+      # Pictures of the main pages with the sample layout open, published with the "screenshots"
+      # pre-release, so changes to the user interface can be checked without a Windows PC.
+      - name: Take screenshots
+        continue-on-error: true
+        shell: pwsh
+        env:
+          KBDKING_NO_DIALOGS: "1"
+        run: |
+          Add-Type -AssemblyName System.Drawing
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          public static class Win
+          {
+              [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+              [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window, out RECT rect);
+              [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
+              [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr window, IntPtr dc, uint flags);
+              [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+          }
+          '@
+          [Win]::SetProcessDPIAware() | Out-Null
+          New-Item -ItemType Directory -Force screenshots | Out-Null
+          $sample = (Resolve-Path samples/german-austria-iast.kbdking).Path
+          $shots = @(
+            @('layouts', 'layouts', ''), @('keys', 'tab-keys', ''), @('keys-altgr', 'tab-keys', 'altgr'),
+            @('deadkeys', 'tab-deadkeys', ''), @('compose', 'tab-compose', ''), @('assistant', 'tab-assistant', ''),
+            @('analysis', 'tab-analysis', ''), @('tests', 'tab-tests', ''), @('layout', 'tab-layout', ''), @('about', 'about', '')
+          )
+          foreach ($shot in $shots) {
+            $env:KBDKING_TAB = $shot[1]
+            $env:KBDKING_SHIFT_STATE = $shot[2]
+            $p = Start-Process -FilePath app-out/Kbdking.App.exe -ArgumentList "`"$sample`"" -PassThru
+            Start-Sleep -Seconds 12
+            $p.Refresh()
+            if ($p.HasExited -or $p.MainWindowHandle -eq 0) { Write-Output "::warning title=Screenshot::$($shot[0]): no window"; continue }
+            $window = $p.MainWindowHandle
+            [Win]::SetForegroundWindow($window) | Out-Null
+            Start-Sleep -Milliseconds 800
+            $rect = New-Object Win+RECT
+            [Win]::GetWindowRect($window, [ref]$rect) | Out-Null
+            $bmp = New-Object System.Drawing.Bitmap ($rect.Right - $rect.Left), ($rect.Bottom - $rect.Top)
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $dc = $g.GetHdc()
+            $ok = [Win]::PrintWindow($window, $dc, 2)  # PW_RENDERFULLCONTENT: also WinUI's composed content
+            $g.ReleaseHdc($dc)
+            if (-not $ok) { $g.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bmp.Size) }
+            $bmp.Save("screenshots/$($shot[0]).png", [System.Drawing.Imaging.ImageFormat]::Png)
+            $g.Dispose(); $bmp.Dispose()
+            Stop-Process -Id $p.Id -Force
+            Start-Sleep -Seconds 1
+          }
+          $log = Join-Path $env:LOCALAPPDATA 'kbdking\crash.log'
+          if (Test-Path $log) { Write-Output "::warning title=Screenshots::$((Get-Content $log -Raw) -replace '%','%25' -replace "`r",'' -replace "`n",'%0A')" }
+          Write-Output "::notice title=Screenshots::$((Get-ChildItem screenshots -Filter *.png).Count) pictures"
+
+      - uses: actions/upload-artifact@v5
+        continue-on-error: true
+        with:
+          name: screenshots
+          path: screenshots/*.png
+
   installer:
     name: Windows installer (${{ matrix.arch }})
     runs-on: windows-latest
@@ -285,3 +347,21 @@ jobs:
           gh release create latest dist/*.msi --prerelease --target "${{ github.sha }}" \
             --title "Latest build (0.1.${{ github.run_number }})" \
             --notes "Automatic build of the newest commit on main (${GITHUB_SHA::7}). Not signed yet: Windows may warn that it doesn't know the publisher; choose More info → Run anyway. Download kbdking-x64.msi (or kbdking-arm64.msi for Windows on ARM) and run it."
+
+      - uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          name: screenshots
+          path: screenshots
+
+      - name: Update the "screenshots" pre-release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls screenshots/*.png >/dev/null 2>&1 || exit 0
+          gh release delete screenshots --yes --cleanup-tag || true
+          gh release create screenshots screenshots/*.png --prerelease --target "${{ github.sha }}" \
+            --title "Screenshots of build 0.1.${{ github.run_number }}" \
+            --notes "Pictures of the app taken automatically by the build (${GITHUB_SHA::7}), for checking the user interface. Not a download."

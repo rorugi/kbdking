@@ -4,7 +4,7 @@
   "metadata": {
     "name": "German (Austria) + IAST",
     "description": "Standard German (Austria) layout plus IAST transliteration for Sanskrit on AltGr. AltGr+a/i/u = ā ī ū, AltGr+s = ś, AltGr+g = ṅ, AltGr+n = ñ (Shift for capitals), AltGr+r = √ (root sign, as in √gam). AltGr+. is a dot-below dead key (ṭ ḍ ṇ ṣ ṛ ḷ ṃ ḥ), AltGr+- a macron dead key; dot below then macron (or the reverse) followed by r or l gives ṝ ḹ.",
-    "author": "kbdking contributors",
+    "author": "Roland Russwurm",
     "version": "1.0",
     "locale": "de-AT",
     "dllName": "kbdiast",

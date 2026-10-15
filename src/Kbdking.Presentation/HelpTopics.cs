@@ -36,6 +36,8 @@ public static class HelpTopics
             "layout already has and proposes:\n" +
             "• a dead key for an accent that many of your characters share, on a key that looks like it (dot below on the . key),\n" +
             "• chained dead keys for letters with two accents (ṝ = dot below + macron),\n" +
+            "• a key with the combining accent for letters Unicode has no single character for, typed after the letter " +
+            "(r, then the ring below → r̥),\n" +
             "• direct AltGr positions on the base letter for the rest (AltGr+n → ñ).\n\n" +
             "Untick what you don't want and press Apply. Everything can be undone."),
         ["tab-analysis"] = new("Text analysis",
@@ -103,8 +105,10 @@ public static class HelpTopics
         // ------------------------------------------------------------ compose / assistant / analysis
         ["compose-key"] = new("Which key is Compose",
             "The key you press to start a sequence. The Menu key (between AltGr and right Ctrl) is unused on most keyboards. " +
-            "Right Windows works too and keeps the left Windows key. The Copilot key sends Windows + Shift + F23; as the compose key " +
-            "it stops opening Copilot. Caps Lock is a popular choice if you don't need Caps Lock.\n\n" +
+            "Right Windows works too and keeps the left Windows key. Caps Lock is a popular choice if you don't need Caps Lock.\n\n" +
+            "The Copilot key sends Windows + Shift + F23, and Windows may open Copilot with it before the layout sees the key. " +
+            "Then set Settings > Bluetooth & devices > Keyboard > Copilot key to \"Right Ctrl\" (Windows 11 update of October 2026 or " +
+            "later) and choose Right Ctrl as the compose key; \"Context menu\" with the Menu key works the same way.\n\n" +
             "The chosen key loses its old function in this layout only."),
         ["compose-accent"] = new("Shown while waiting",
             "Windows needs a character for the waiting state of a dead key. Some programs show it briefly while you type the " +

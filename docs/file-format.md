@@ -191,7 +191,8 @@ layout is built, so they work in every app without extra software.
 ```
 
 - `key`: the scan code of the compose key, `E0 5D` (the Menu key) by default; `E0 5C` is the right Windows
-  key, `6E` the Copilot key (it sends Win + Shift + F23; as the compose key it no longer opens Copilot),
+  key, `6E` the Copilot key (it sends Win + Shift + F23; Windows may still open Copilot with it, so setting the Copilot
+  key to Right Ctrl in Settings > Bluetooth & devices > Keyboard and using `E0 1D` is more reliable),
   `3A` Caps Lock. Right Alt (`E0 38`) only works if the layout has no AltGr characters. kbdking gives that key a free virtual key that types a dead key.
 - `accent`: what Windows shows while it waits for the rest of the sequence (default ⎄ U+2384).
 - `sequences`: `[keys, result]`. `keys` are the characters typed after the compose key, as they are typed

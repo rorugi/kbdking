@@ -20,6 +20,8 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1280, 860));
+        var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "kbdking.ico");
+        if (File.Exists(icon)) AppWindow.SetIcon(icon);
 
         var dialogs = _dialogs = new DialogService(this);
         var privileged = new CliPrivilegedOperations();
@@ -36,6 +38,44 @@ public sealed partial class MainWindow : Window
         _editorView = new EditorView(editor);
         Nav.SelectedItem = LayoutsItem;
         manager.Refresh();
+        Nav.Loaded += OnFirstLoaded;
+    }
+
+    /// <summary>
+    /// A layout file given on the command line ("Open with") opens in the editor. KBDKING_TAB=&lt;topic id&gt;
+    /// (e.g. tab-assistant, or "about") opens that page; the build uses it to take screenshots.
+    /// </summary>
+    private async void OnFirstLoaded(object sender, RoutedEventArgs e)
+    {
+        Nav.Loaded -= OnFirstLoaded;
+        try
+        {
+            if (Environment.GetCommandLineArgs().Skip(1).FirstOrDefault(File.Exists) is { } file && await _editor.OpenFileInteractiveAsync(file))
+                Nav.SelectedItem = EditorItem;
+            switch (Environment.GetEnvironmentVariable("KBDKING_TAB"))
+            {
+                case null or "":
+                    break;
+                case "about":
+                    Nav.SelectedItem = AboutItem;
+                    break;
+                case "layouts":
+                    Nav.SelectedItem = LayoutsItem;
+                    break;
+                case var tab:
+                    Nav.SelectedItem = EditorItem;
+                    _editorView.SelectTab(tab);
+                    break;
+            }
+            // KBDKING_SHIFT_STATE=altgr shows the keyboard in that shift state (also for screenshots).
+            if (Kbdking.Core.Model.ShiftState.TryParse(Environment.GetEnvironmentVariable("KBDKING_SHIFT_STATE"), out var state)
+                && _editor.ShiftStates.FirstOrDefault(o => o.State == state) is { } option)
+                _editor.SelectedState = option;
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex);
+        }
     }
 
     /// <summary>Shows an unexpected error instead of crashing.</summary>

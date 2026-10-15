@@ -21,7 +21,7 @@
             <NavigationViewItem x:Name="EditorItem" Content="Editor" Tag="editor" Icon="Edit" />
         </NavigationView.MenuItems>
         <NavigationView.FooterMenuItems>
-            <NavigationViewItem Content="About" Tag="about" Icon="Help" />
+            <NavigationViewItem x:Name="AboutItem" Content="About" Tag="about" Icon="Help" />
         </NavigationView.FooterMenuItems>
         <ContentControl
             x:Name="Host"
