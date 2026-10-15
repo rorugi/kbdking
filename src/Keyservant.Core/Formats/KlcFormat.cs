@@ -59,6 +59,7 @@ public sealed class KlcFormat : ILayoutFormat
 
         var columns = new List<ShiftState>();
         var ligatures = new List<(byte Vk, int Column, string Text, int Line)>();
+        var pendingLigatures = new HashSet<(byte Vk, ShiftState State)>();
         var namesCleared = new HashSet<string>();
         string section = "";
         DeadKeyDefinition? currentDead = null;
@@ -126,7 +127,7 @@ public sealed class KlcFormat : ILayoutFormat
                         break;
                     }
                     if (tokens.Count < 3) throw Error(lineNo, "A LAYOUT line needs: scan code, virtual key, Caps Lock flag, characters.");
-                    lastKey = ParseLayoutLine(layout, template, tokens, columns, lineNo);
+                    lastKey = ParseLayoutLine(layout, template, tokens, columns, lineNo, pendingLigatures);
                     break;
 
                 case "LIGATURE":
@@ -134,9 +135,12 @@ public sealed class KlcFormat : ILayoutFormat
                     var lvk = ParseVk(tokens[0], lineNo);
                     if (!int.TryParse(tokens[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var col))
                         throw Error(lineNo, $"Invalid ligature column '{tokens[1]}'.");
+                    // Each token is one UTF-16 unit, so characters outside the BMP span two tokens (d835 dd38).
                     var sb = new StringBuilder();
-                    foreach (var t in tokens.Skip(2)) sb.Append(ParseHexString(t, lineNo));
-                    ligatures.Add((lvk, col, sb.ToString(), lineNo));
+                    foreach (var t in tokens.Skip(2)) sb.Append(ParseUtf16Unit(t, lineNo));
+                    var ligature = sb.ToString();
+                    if (!IsWellFormed(ligature)) throw Error(lineNo, "The ligature contains an unpaired surrogate.");
+                    ligatures.Add((lvk, col, ligature, lineNo));
                     break;
 
                 case "DEADKEY":
@@ -191,22 +195,19 @@ public sealed class KlcFormat : ILayoutFormat
             if (column < 0 || column >= columns.Count) throw Error(line, $"Ligature column {column} does not exist.");
             var key = layout.FindKey(vk) ?? throw Error(line, $"Ligature for {VirtualKeys.GetName(vk)}, which is not in LAYOUT.");
             key.Outputs[columns[column]] = KeyOutput.Of(value);
+            pendingLigatures.Remove((vk, columns[column]));
         }
-        foreach (var key in layout.Keys)
+        if (pendingLigatures.Count > 0)
         {
-            foreach (var (state, output) in key.Outputs)
-            {
-                if (output.Text == LigaturePlaceholder) throw new LayoutFormatException($"Key {key.Name} has %% in state {state} but no LIGATURE entry.");
-            }
+            var (pvk, pstate) = pendingLigatures.First();
+            throw new LayoutFormatException($"Key {VirtualKeys.GetName(pvk)} has %% in state {pstate} but no LIGATURE entry.");
         }
         layout.NormalizeShiftStates();
         return layout;
     }
 
-    private const string LigaturePlaceholder = "";
-
     private static KeyDefinition ParseLayoutLine(KeyboardLayout layout, KeyboardLayout template, List<string> tokens,
-        List<ShiftState> columns, int lineNo)
+        List<ShiftState> columns, int lineNo, HashSet<(byte, ShiftState)> pendingLigatures)
     {
         var scToken = tokens[0];
         var vk = ParseVk(tokens[1], lineNo);
@@ -244,7 +245,7 @@ public sealed class KlcFormat : ILayoutFormat
         for (var c = 0; c < columns.Count && 3 + c < tokens.Count; c++)
         {
             var output = ParseOutput(tokens[3 + c], lineNo, out var isLigature);
-            if (isLigature) key.Outputs[columns[c]] = KeyOutput.Of(LigaturePlaceholder);
+            if (isLigature) pendingLigatures.Add((vk, columns[c]));
             else if (output is not null)
             {
                 key.Outputs[columns[c]] = output;
@@ -275,6 +276,20 @@ public sealed class KlcFormat : ILayoutFormat
         if (!int.TryParse(token, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var cp) || cp is < 0 or > 0x10FFFF)
             throw Error(lineNo, $"Invalid character code '{token}'.");
         return char.ConvertFromUtf32(cp is >= 0xD800 and <= 0xDFFF ? throw Error(lineNo, $"Lone surrogate '{token}'.") : cp);
+    }
+
+    private static char ParseUtf16Unit(string token, int lineNo) =>
+        ushort.TryParse(token, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var unit)
+            ? (char)unit : throw Error(lineNo, $"Invalid UTF-16 code '{token}'.");
+
+    private static bool IsWellFormed(string s)
+    {
+        for (var i = 0; i < s.Length; i++)
+        {
+            if (char.IsHighSurrogate(s[i]) && i + 1 < s.Length && char.IsLowSurrogate(s[i + 1])) i++;
+            else if (char.IsSurrogate(s[i])) return false;
+        }
+        return true;
     }
 
     private static char ParseHexChar(string token, int lineNo)
@@ -357,9 +372,12 @@ public sealed class KlcFormat : ILayoutFormat
         var m = layout.Metadata;
         var sb = new StringBuilder();
         void Line(string s = "") => sb.Append(s).Append("\r\n");
-        static string Q(string? s) => "\"" + (s ?? "").Replace("\"", "'", StringComparison.Ordinal) + "\"";
+        static string Q(string? s) => "\"" + Clean(s).Replace("\"", "'", StringComparison.Ordinal) + "\"";
+        var layerBits = layout.Modifiers.VkToBits.Aggregate(ModifierBits.None, (a, b) => a | b.Bits) & ~(ModifierBits.Shift | ModifierBits.Ctrl | ModifierBits.Alt);
+        if (layerBits != ModifierBits.None)
+            report.Warn("Layer keys (and other extra modifier keys) can't be stored in .klc; their columns are kept, but no key selects them after import.");
 
-        Line($"KBD\t{m.DllName}\t{Q(m.Name)}");
+        Line($"KBD\t{Clean(m.DllName)}\t{Q(m.Name)}");
         Line();
         Line($"COPYRIGHT\t{Q(m.Copyright)}");
         Line();
@@ -369,7 +387,7 @@ public sealed class KlcFormat : ILayoutFormat
         Line();
         Line($"LOCALEID\t{Q(m.LanguageId.ToString("x8", CultureInfo.InvariantCulture))}");
         Line();
-        Line($"VERSION\t{m.Version}");
+        Line($"VERSION\t{(m.Version.Any(char.IsWhiteSpace) ? Q(m.Version) : Clean(m.Version))}");
         Line();
 
         var columns = layout.Modifiers.Columns;
@@ -453,7 +471,11 @@ public sealed class KlcFormat : ILayoutFormat
             Line();
         }
 
-        static string Name(string s) => s.Any(char.IsWhiteSpace) ? "\"" + s + "\"" : s;
+        static string Name(string s)
+        {
+            s = Clean(s).Replace("\"", "'", StringComparison.Ordinal);
+            return s.Length == 0 || s.Any(char.IsWhiteSpace) || s.Contains("//", StringComparison.Ordinal) || s.Contains(';') ? "\"" + s + "\"" : s;
+        }
         Line("KEYNAME");
         Line();
         foreach (var (sc, name) in layout.KeyNames) Line($"{sc:x2}\t{Name(name)}");
@@ -466,13 +488,13 @@ public sealed class KlcFormat : ILayoutFormat
         {
             Line("KEYNAME_DEAD");
             Line();
-            foreach (var d in layout.DeadKeys.Where(d => !string.IsNullOrEmpty(d.Name))) Line($"{Hex(d.Accent)}\t\"{d.Name}\"");
+            foreach (var d in layout.DeadKeys.Where(d => !string.IsNullOrEmpty(d.Name))) Line($"{Hex(d.Accent)}\t{Name(d.Name!)}");
             Line();
         }
 
         Line("DESCRIPTIONS");
         Line();
-        Line($"0409\t{m.Name}");
+        Line($"0409\t{Clean(m.Name)}");
         Line();
         Line("LANGUAGENAMES");
         Line();
@@ -542,6 +564,9 @@ public sealed class KlcFormat : ILayoutFormat
         return standard.Outputs.Count == key.Outputs.Count
             && standard.Outputs.All(p => key.Outputs.TryGetValue(p.Key, out var o) && o == p.Value);
     }
+
+    /// <summary>Line breaks and tabs would end the field early in .klc's line-based syntax.</summary>
+    private static string Clean(string? s) => (s ?? "").Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ');
 
     private static string Hex(char c) => ((int)c).ToString("x4", CultureInfo.InvariantCulture);
 

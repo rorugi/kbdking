@@ -76,6 +76,9 @@ public sealed partial class EditorView : UserControl
     private void Preview_PreviewKeyUp(object sender, KeyRoutedEventArgs e) =>
         e.Handled = ViewModel.HandlePreviewKeyUp((int)e.KeyStatus.ScanCode, e.KeyStatus.IsExtendedKey);
 
+    /// <summary>Key-up events go elsewhere once the preview loses focus, so forget held layer keys.</summary>
+    private void Preview_LostFocus(object sender, RoutedEventArgs e) => ViewModel.ResetPreviewKeys();
+
     // ---------------------------------------------------------------- Unicode picker
 
     /// <summary>Opens the character search next to a field; the picked character goes into that field.</summary>
@@ -102,6 +105,7 @@ public sealed partial class EditorView : UserControl
             ItemTemplate = (DataTemplate)Resources["UnicodeItemTemplate"],
             ItemsSource = picker.Results,
         };
+        list.SetBinding(Selector.SelectedItemProperty, new Binding { Path = new PropertyPath(nameof(UnicodePickerViewModel.Selected)), Mode = BindingMode.TwoWay });
         var footer = new TextBlock { Text = $"{picker.UnicodeVersion} · works offline", Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"] };
         var panel = new StackPanel { Spacing = 8, DataContext = picker, Children = { query, summary, list, footer } };
         var flyout = new Flyout { Content = panel };
@@ -127,8 +131,12 @@ public sealed partial class EditorView : UserControl
         else if (e.PropertyName == nameof(CompareViewModel.DiffSvg)) await ShowSvgAsync(DiffImage, ViewModel.Compare.DiffSvg);
     }
 
-    private static async Task ShowSvgAsync(Image image, string? svg)
+    private readonly Dictionary<Image, int> _svgVersions = [];
+
+    /// <summary>Shows SVG text in an image. Renders can overlap; only the newest one is shown.</summary>
+    private async Task ShowSvgAsync(Image image, string? svg)
     {
+        var version = _svgVersions[image] = _svgVersions.GetValueOrDefault(image) + 1;
         if (svg is null)
         {
             image.Source = null;
@@ -144,8 +152,9 @@ public sealed partial class EditorView : UserControl
             writer.DetachStream();
         }
         stream.Seek(0);
-        await source.SetSourceAsync(stream);
-        image.Source = source;
+        var status = await source.SetSourceAsync(stream);
+        if (version != _svgVersions[image]) return; // a newer picture is on its way
+        image.Source = status == SvgImageSourceLoadStatus.Success ? source : null;
     }
 
     private void SendToAssistant_Click(object sender, RoutedEventArgs e) => ViewModel.Analysis.SendUntypeableToAssistant();

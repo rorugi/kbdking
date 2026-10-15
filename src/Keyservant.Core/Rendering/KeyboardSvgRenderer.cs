@@ -84,7 +84,7 @@ public static class KeyboardSvgRenderer
         var keys = KeyboardGeometry.Rows(o.Shape).SelectMany(r => r)
             .Where(k => k.FixedLabel is null && VirtualKeyOf(layout, k) is { } vk && layout.FindKey(vk) is not null && k.ScanCode != 0x39)
             .ToList();
-        var size = o.StickerSize;
+        var size = Math.Clamp(o.StickerSize, 5, 60);
         const double spacing = 3, margin = 10;
         var perRow = (int)Math.Floor((210 - 2 * margin + spacing) / (size + spacing));
         var rowsNeeded = (keys.Count + perRow - 1) / perRow;
@@ -146,7 +146,6 @@ public static class KeyboardSvgRenderer
             var c = t[0];
             if (char.IsControl(c)) return "";
             if (CharUnicodeInfo.GetUnicodeCategory(c) is UnicodeCategory.NonSpacingMark or UnicodeCategory.EnclosingMark) return "◌" + c;
-            if (c is >= '' and <= '') return "⎄";
         }
         return t;
     }
@@ -172,7 +171,27 @@ public static class KeyboardSvgRenderer
     private static void Text(StringBuilder sb, double x, double y, double size, string text, string anchor, string color, bool bold = false)
     {
         sb.Append(Inv($"<text x=\"{x:0.##}\" y=\"{y:0.##}\" font-size=\"{size:0.##}\" text-anchor=\"{anchor}\" fill=\"{color}\"{(bold ? " font-weight=\"600\"" : "")}>"))
-          .Append(SecurityElement.Escape(text)).Append("</text>\n");
+          .Append(SecurityElement.Escape(XmlSafe(text))).Append("</text>\n");
+    }
+
+    /// <summary>Replaces characters XML 1.0 can't contain (most control characters, unpaired surrogates) with U+FFFD.</summary>
+    private static string XmlSafe(string text)
+    {
+        StringBuilder? sb = null;
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            var ok = c is '\t' or '\n' or '\r' || c >= ' ' && c is not ('\uFFFE' or '\uFFFF') && !char.IsSurrogate(c);
+            if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+            {
+                sb?.Append(c).Append(text[i + 1]);
+                i++;
+                continue;
+            }
+            if (!ok) sb ??= new StringBuilder(text, 0, i, text.Length);
+            sb?.Append(ok ? c : '\uFFFD');
+        }
+        return sb?.ToString() ?? text;
     }
 
     private static string Inv(FormattableString s) => s.ToString(CultureInfo.InvariantCulture);

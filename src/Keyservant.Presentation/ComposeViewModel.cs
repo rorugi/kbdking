@@ -124,7 +124,8 @@ public sealed class ComposeViewModel : ObservableObject
         try
         {
             var c = _editor.Layout.Compose;
-            _all = c is null ? [] : [.. c.Sequences.Select(s => new ComposeSequenceViewModel(this, s))];
+            var unfinished = _all.Where(s => s.ToSequence() is null).ToList(); // rows still being filled in
+            _all = c is null ? [] : [.. unfinished, .. c.Sequences.Select(s => new ComposeSequenceViewModel(this, s))];
             SelectedKey = c is null ? null : KeyOptions.FirstOrDefault(k => k.ScanCode == c.ScanCode && k.Extended == c.Extended);
             Accent = c is null ? "" : c.Accent.ToString();
             ApplyFilter();
@@ -151,7 +152,7 @@ public sealed class ComposeViewModel : ObservableObject
 
     private void Add()
     {
-        _editor.Layout.Compose ??= new ComposeDefinition();
+        if (_editor.Layout.Compose is null) IsEnabled = true; // records the change and loads the compose settings
         var row = new ComposeSequenceViewModel(this, new ComposeSequence("", ""));
         _all.Insert(0, row);
         Filter = "";
@@ -188,7 +189,7 @@ public sealed class ComposeViewModel : ObservableObject
             Summary = "Compose is off. Switch it on to type characters as short sequences, e.g. Compose . r → ṛ.";
             return;
         }
-        var result = ComposeCompiler.Compile(_editor.Layout);
+        var result = _editor.Compilation;
         foreach (var e in result.Errors) Warnings.Add("Error: " + e);
         foreach (var w in result.Warnings.Take(200)) Warnings.Add(w);
         if (result.Warnings.Count > 200) Warnings.Add($"… and {result.Warnings.Count - 200} more.");

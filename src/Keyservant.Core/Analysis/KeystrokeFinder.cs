@@ -7,11 +7,12 @@ public sealed record TypingRecipe(IReadOnlyList<KeyStroke> Strokes, double Effor
 
 /// <summary>
 /// Finds the cheapest keystroke sequence that types a given text with a layout, including dead keys and
-/// chained dead keys (breadth-first over dead-key states, at most four strokes).
+/// chained dead keys (breadth-first over dead-key states, at most six strokes). Only keys and modifier
+/// combinations a physical key can actually produce are used.
 /// </summary>
 public sealed class KeystrokeFinder
 {
-    private const int MaxStrokes = 4;
+    private const int MaxStrokes = 6;
 
     private readonly KeyboardLayout _layout;
     private readonly Dictionary<string, TypingRecipe> _best = new(StringComparer.Ordinal);
@@ -25,7 +26,7 @@ public sealed class KeystrokeFinder
 
     public EffortModel Effort { get; }
 
-    /// <summary>Every text the layout can type in at most four strokes.</summary>
+    /// <summary>Every text the layout can type in at most six strokes.</summary>
     public IReadOnlyDictionary<string, TypingRecipe> All => _best;
 
     public TypingRecipe? Find(string text) => _best.GetValueOrDefault(text);
@@ -36,11 +37,18 @@ public sealed class KeystrokeFinder
     {
         // All (stroke, output) pairs, cheapest strokes first.
         var moves = new List<(KeyStroke Stroke, KeyOutput Output, double Cost)>();
+        var sent = _layout.ScanCodes.Normal.Select(t => t.VirtualKey).Concat(_layout.ScanCodes.E0.Values.Select(t => t.VirtualKey)).ToHashSet();
+        var reachableBits = ModifierBits.Shift | ModifierBits.Ctrl | ModifierBits.Alt;
+        foreach (var b in _layout.Modifiers.VkToBits)
+            if (sent.Contains(b.VirtualKey)) reachableBits |= b.Bits;
         foreach (var key in _layout.Keys)
         {
+            // Numpad digits and the decimal key come from numpad scan codes through Num Lock.
+            if (!sent.Contains(key.VirtualKey) && !VirtualKeys.IsNumpadDigit(key.VirtualKey) && key.VirtualKey != VirtualKeys.Decimal) continue;
             foreach (var (state, output) in key.Outputs)
             {
-                if (output.Text.Any(char.IsControl) && !output.IsDead) continue;
+                if ((state.Bits & ~reachableBits) != 0) continue;
+                if (!output.IsDead && output.Text != "\t" && output.Text.Any(char.IsControl)) continue;
                 var stroke = new KeyStroke(key.VirtualKey, state);
                 moves.Add((stroke, output, Effort.StrokeCost(_layout, stroke)));
             }

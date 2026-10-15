@@ -46,7 +46,8 @@ public static partial class LayoutValidator
     [GeneratedRegex("^[0-9A-Fa-f]{8}$")]
     private static partial Regex KlidRegex();
 
-    public static ValidationResult Validate(KeyboardLayout layout)
+    /// <param name="compiled">The layout's compose compilation, if the caller already has it (saves compiling again).</param>
+    public static ValidationResult Validate(KeyboardLayout layout, Compose.ComposeCompilation? compiled = null)
     {
         var r = new ValidationResult();
         void Add(Severity s, string code, string msg, byte? vk = null, ShiftState? st = null) => r.Issues.Add(new(s, code, msg, vk, st));
@@ -59,8 +60,10 @@ public static partial class LayoutValidator
         if (m.LayoutId is not null && !KlidRegex().IsMatch(m.LayoutId))
             Add(Severity.Error, "KS003", $"Layout ID '{m.LayoutId}' must be 8 hex digits, e.g. A0000C07.");
         if (!IsKnownLocale(m.Locale)) Add(Severity.Warning, "KS004", $"Locale '{m.Locale}' is not a known language tag.");
-        if (!Version.TryParse(m.Version.Contains('.', StringComparison.Ordinal) ? m.Version : m.Version + ".0", out _))
+        if (!Version.TryParse(m.Version.Contains('.', StringComparison.Ordinal) ? m.Version : m.Version + ".0", out var parsedVersion))
             Add(Severity.Warning, "KS005", $"Version '{m.Version}' should look like 1.0 or 1.2.3.");
+        else if (new[] { parsedVersion.Major, parsedVersion.Minor, parsedVersion.Build, parsedVersion.Revision }.Any(p => p > 65535))
+            Add(Severity.Error, "KS006", $"Version '{m.Version}': each part can be at most 65535 (Windows stores versions as four 16-bit numbers).");
 
         // Modifiers
         var columns = layout.Modifiers.ColumnCount;
@@ -159,15 +162,16 @@ public static partial class LayoutValidator
                 Add(Severity.Warning, "KS090", $"{state.DisplayName} has characters, but no key on the keyboard selects it. Add a layer key (Advanced → Shift states) or assign the modifier's virtual key to a scan code.");
         }
 
-        if (layout.Compose is { Sequences.Count: > 0 })
+        if (layout.Compose is { Sequences.Count: > 0 } || layout.Tests.Count > 0)
+            compiled ??= Compose.ComposeCompiler.Compile(layout);
+        if (layout.Compose is { Sequences.Count: > 0 } && compiled is not null)
         {
-            var compiled = Compose.ComposeCompiler.Compile(layout);
             foreach (var e in compiled.Errors) Add(Severity.Error, "KS081", "Compose: " + e);
             foreach (var w in compiled.Warnings) Add(Severity.Warning, "KS080", "Compose: " + w);
         }
 
         // Layout tests
-        foreach (var t in LayoutTestRunner.Run(layout))
+        foreach (var t in compiled is null ? [] : layout.Tests.Select(test => LayoutTestRunner.Run(compiled.Layout, test)))
         {
             if (t.Passed) continue;
             var label = t.Test.Name is { Length: > 0 } n ? $"\"{n}\" ({t.Test.Keys})" : t.Test.Keys;
@@ -210,35 +214,36 @@ public static partial class LayoutValidator
         return layout.ScanCodes.E0.Values.Any(t => t.VirtualKey == vk) || layout.ScanCodes.E1.Values.Any(t => t.VirtualKey == vk);
     }
 
-    private static IEnumerable<List<char>> FindChainCycles(KeyboardLayout layout)
+    /// <summary>Loops in chained dead keys, found with one depth-first pass (linear in the number of entries).</summary>
+    private static List<List<char>> FindChainCycles(KeyboardLayout layout)
     {
-        var graph = layout.DeadKeys.ToDictionary(d => d.Accent, d => d.Entries.Where(e => e.Chained).Select(e => e.Result).Distinct().ToList());
-        var reported = new HashSet<string>();
+        var graph = new Dictionary<char, List<char>>();
+        foreach (var d in layout.DeadKeys)
+        {
+            if (!graph.TryGetValue(d.Accent, out var list)) graph[d.Accent] = list = [];
+            list.AddRange(d.Entries.Where(e => e.Chained).Select(e => e.Result).Where(r => !list.Contains(r)));
+        }
+        var cycles = new List<List<char>>();
+        var state = new Dictionary<char, int>(); // 1 = on the current path, 2 = done
+        var path = new List<char>();
         foreach (var start in graph.Keys)
         {
-            var stack = new List<char> { start };
-            foreach (var cycle in Walk(start, stack))
-            {
-                var keyText = new string([.. cycle.OrderBy(c => c)]);
-                if (reported.Add(keyText)) yield return cycle;
-            }
+            if (!state.ContainsKey(start)) Visit(start);
         }
+        return cycles;
 
-        IEnumerable<List<char>> Walk(char node, List<char> path)
+        void Visit(char node)
         {
-            if (!graph.TryGetValue(node, out var next)) yield break;
-            foreach (var n in next)
+            state[node] = 1;
+            path.Add(node);
+            foreach (var n in graph.GetValueOrDefault(node) ?? [])
             {
-                var idx = path.IndexOf(n);
-                if (idx >= 0)
-                {
-                    yield return [.. path.Skip(idx), n];
-                    continue;
-                }
-                path.Add(n);
-                foreach (var c in Walk(n, path)) yield return c;
-                path.RemoveAt(path.Count - 1);
+                var s = state.GetValueOrDefault(n);
+                if (s == 1) cycles.Add([.. path.Skip(path.IndexOf(n)), n]);
+                else if (s == 0 && graph.ContainsKey(n)) Visit(n);
             }
+            path.RemoveAt(path.Count - 1);
+            state[node] = 2;
         }
     }
 

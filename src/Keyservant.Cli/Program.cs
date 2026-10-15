@@ -426,7 +426,9 @@ internal static partial class Program
         int? minutes = temporary is null ? null
             : int.TryParse(temporary, out var m) && m is > 0 and <= 7 * 24 * 60 ? m
             : throw new UsageException("--temporary needs a number of minutes (1 to 10080).");
-        if (!Elevation.IsAdministrator) return Relaunch(rawArgs, Path.GetFullPath(path));
+        if (minutes is not null && Path.GetFileNameWithoutExtension(Environment.ProcessPath ?? "").Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+            throw new UsageException("Test installs need keyservant.exe (the scheduled removal can't start 'dotnet'). Use the published keyservant.exe.");
+        if (!Elevation.IsAdministrator) return Relaunch(rawArgs, path);
 
         var layout = Load(path);
         var result = LayoutDllBuilder.Build(layout);
@@ -484,10 +486,11 @@ internal static partial class Program
 
     /// <summary>Runs this command again with administrator rights and prints its output.</summary>
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    private static int Relaunch(string[] rawArgs, string? fullPath)
+    private static int Relaunch(string[] rawArgs, string? pathArgument)
     {
         var args = rawArgs.ToArray();
-        if (fullPath is not null) args[1] = fullPath; // the elevated process may start in another directory
+        // The elevated process may start in another directory, so pass the file with its full path.
+        if (pathArgument is not null && Array.IndexOf(args, pathArgument, 1) is var index and > 0) args[index] = Path.GetFullPath(pathArgument);
         var log = Path.Combine(Path.GetTempPath(), $"keyservant-{Guid.NewGuid():N}.log");
         var exe = Environment.ProcessPath ?? throw new LayoutSystemException("Can't find the keyservant executable.");
         Out.WriteLine("Asking for administrator rights...");

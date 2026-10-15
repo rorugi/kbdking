@@ -338,8 +338,10 @@ public sealed class TestsViewModel : ObservableObject
     internal void Load()
     {
         _loading = true;
+        var unfinished = Tests.Where(t => t.ToTest() is null).ToList(); // rows still being filled in aren't in the layout yet
         Tests.Clear();
         foreach (var t in _editor.Layout.Tests) Tests.Add(new TestCaseViewModel(this, t));
+        foreach (var t in unfinished) Tests.Add(t);
         _loading = false;
         UpdateResults();
     }
@@ -436,6 +438,12 @@ public sealed class CompareViewModel : ObservableObject
         if (_other is not null) Run();
     }
 
+    /// <summary>Keeps the comparison and the marked keys current while editing.</summary>
+    internal void LayoutEdited()
+    {
+        if (_other is not null) Run();
+    }
+
     /// <summary>Compares with an already loaded layout (also used by tests).</summary>
     public void CompareWith(KeyboardLayout other, string name)
     {
@@ -454,7 +462,14 @@ public sealed class CompareViewModel : ObservableObject
     private void CompareWithSaved()
     {
         if (_editor.FilePath is not { } path) return;
-        CompareWith(KeyservantFormat.Parse(File.ReadAllText(path)), "the saved file");
+        try
+        {
+            CompareWith(KeyservantFormat.Parse(File.ReadAllText(path)), "the saved file");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or LayoutFormatException)
+        {
+            _editor.ReportError(ex);
+        }
     }
 
     private void Clear()

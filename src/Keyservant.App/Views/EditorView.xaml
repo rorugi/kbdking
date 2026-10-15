@@ -221,6 +221,7 @@
                                 IsReadOnly="True"
                                 PreviewKeyDown="Preview_PreviewKeyDown"
                                 PreviewKeyUp="Preview_PreviewKeyUp"
+                                LostFocus="Preview_LostFocus"
                                 Text="{x:Bind ViewModel.PreviewText, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                             <Button Content="Clear" Command="{x:Bind ViewModel.ClearPreviewCommand}" />

@@ -205,17 +205,31 @@ public static class PlacementPlanner
             }
             var intermediate = list[0].Char[0];
             var items = list.ToList();
+            // ǖ (u + ¨ + ¯) and ṻ (u + ¯ + ¨) both wanted: the order of the dead keys decides. Otherwise either order works.
+            var ordered = chains.ContainsKey((m2, m1));
             plan.Changes.Add(Record(work, new PlannedChange(PlannedChangeKind.Chain,
-                $"Chain {Marks[m1].Name} + {Marks[m2].Name} (either order), then {string.Join(" ", items.Select(x => $"{x.Base}→{x.Char}"))}",
+                $"Chain {Marks[m1].Name} + {Marks[m2].Name}{(ordered ? "" : " (either order)")}, then {string.Join(" ", items.Select(x => $"{x.Base}→{x.Char}"))}",
                 [.. items.Select(x => x.Char)],
                 l =>
                 {
-                    l.GetOrAddDeadKey(a1).Set(a2, intermediate, chained: true);
-                    l.GetOrAddDeadKey(a2).Set(a1, intermediate, chained: true);
-                    var state = l.GetOrAddDeadKey(intermediate);
-                    state.Name ??= $"{Marks[m1].Name} and {Marks[m2].Name}".ToUpperInvariant();
-                    if (state.Find(' ') is null) state.Set(' ', intermediate);
-                    foreach (var (ch, b) in items) if (state.Find(b) is null) state.Set(b, ch[0]);
+                    // Reuse an existing chain from the first dead key to the second; never overwrite other entries.
+                    char? Link(char from, char to)
+                    {
+                        var dead = l.GetOrAddDeadKey(from);
+                        if (dead.Find(to) is { } existing) return existing.Chained ? existing.Result : null;
+                        dead.Set(to, intermediate, chained: true);
+                        return intermediate;
+                    }
+                    var states = new HashSet<char>();
+                    if (Link(a1, a2) is { } s1) states.Add(s1);
+                    if (!ordered && Link(a2, a1) is { } s2) states.Add(s2);
+                    foreach (var accent in states)
+                    {
+                        var state = l.GetOrAddDeadKey(accent);
+                        state.Name ??= $"{Marks[m1].Name} and {Marks[m2].Name}".ToUpperInvariant();
+                        if (state.Find(' ') is null) state.Set(' ', accent);
+                        foreach (var (ch, b) in items) if (state.Find(b) is null) state.Set(b, ch[0]);
+                    }
                 })));
         }
 
@@ -239,7 +253,7 @@ public static class PlacementPlanner
             var (vk, state) = slot.Value;
             var label = KeySequence.Format([new KeyStroke(vk, state)], work);
             plan.Changes.Add(Record(work, new PlannedChange(PlannedChangeKind.DirectKey, $"{label} → {c}", [c],
-                l => { if (l.FindKey(vk)?[state] is null) l.SetOutput(vk, state, KeyOutput.Of(c)); })));
+                l => { if (IsFree(l, vk, state)) l.SetOutput(vk, state, KeyOutput.Of(c)); })));
         }
         return plan;
     }
@@ -276,7 +290,8 @@ public static class PlacementPlanner
         return null;
     }
 
-    private static bool IsFree(KeyboardLayout l, byte vk, ShiftState state) => l.FindKey(vk)?[state] is null;
+    /// <summary>Checks the column the state actually uses (Shift+AltGr may share the AltGr column).</summary>
+    private static bool IsFree(KeyboardLayout l, byte vk, ShiftState state) => l.FindKey(vk)?[l.Modifiers.Canonicalize(state) ?? state] is null;
 
     private static (byte, ShiftState)? FindSlotForSymbols(KeyboardLayout l, string symbols)
     {

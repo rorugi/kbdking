@@ -62,8 +62,13 @@ public static class UnicodeCatalog
     {
         if (s_data.Value.Names.TryGetValue(codePoint, out var name)) return name;
         if (codePoint is >= 0xAC00 and <= 0xD7A3) return "HANGUL SYLLABLE " + HangulSyllableName(codePoint);
-        if (codePoint is >= 0x4E00 and <= 0x9FFF or >= 0x3400 and <= 0x4DBF or >= 0x20000 and <= 0x3134F)
-            return CharUnicodeInfo.GetUnicodeCategory(codePoint) == UnicodeCategory.OtherLetter ? $"CJK UNIFIED IDEOGRAPH-{codePoint:X4}" : null;
+        string? Algorithmic(string prefix) => CharUnicodeInfo.GetUnicodeCategory(codePoint) == UnicodeCategory.OtherLetter ? $"{prefix}-{codePoint:X4}" : null;
+        if (codePoint is >= 0x4E00 and <= 0x9FFF or >= 0x3400 and <= 0x4DBF or >= 0x20000 and <= 0x3134F or >= 0x31350 and <= 0x323AF or >= 0x2EBF0 and <= 0x2EE5D)
+            return Algorithmic("CJK UNIFIED IDEOGRAPH");
+        if (codePoint is >= 0xF900 and <= 0xFAFF or >= 0x2F800 and <= 0x2FA1F) return Algorithmic("CJK COMPATIBILITY IDEOGRAPH");
+        if (codePoint is >= 0x17000 and <= 0x187FF or >= 0x18D00 and <= 0x18D08) return Algorithmic("TANGUT IDEOGRAPH");
+        if (codePoint is >= 0x18B00 and <= 0x18CD5) return Algorithmic("KHITAN SMALL SCRIPT CHARACTER");
+        if (codePoint is >= 0x1B170 and <= 0x1B2FB) return Algorithmic("NUSHU CHARACTER");
         if (codePoint is >= 0xE000 and <= 0xF8FF) return "PRIVATE USE";
         return null;
     }
@@ -91,8 +96,10 @@ public static class UnicodeCatalog
         }
 
         // Code point.
-        var hex = query.StartsWith("U+", StringComparison.OrdinalIgnoreCase) ? query[2..] : query.StartsWith("\\u", StringComparison.OrdinalIgnoreCase) ? query[2..] : query;
-        if (hex.Length is >= 4 and <= 6 && int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var cp) && Get(cp) is { } exact)
+        var prefixed = query.StartsWith("U+", StringComparison.OrdinalIgnoreCase) || query.StartsWith("\\u", StringComparison.OrdinalIgnoreCase);
+        var hex = prefixed ? query[2..] : query;
+        // A bare word like "cafe" or "dead" is a name, not a code; bare codes need a digit (1E6D).
+        if ((prefixed || hex.Any(char.IsAsciiDigit)) && hex.Length is >= 4 and <= 6 && int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var cp) && Get(cp) is { } exact)
             results.Add(exact);
 
         var words = query.ToUpperInvariant().Split([' ', '-', ',', '+'], StringSplitOptions.RemoveEmptyEntries);

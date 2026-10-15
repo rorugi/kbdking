@@ -53,6 +53,13 @@ public sealed class LayoutHistory
         if (group is not null && group == _lastGroup && now - _lastTime < MergeWindow && _index > 0)
         {
             _states[_index] = snapshot;
+            // Typing and deleting the same text within one step leaves nothing to undo.
+            if (snapshot == _states[_index - 1])
+            {
+                _states.RemoveAt(_index);
+                _index--;
+                group = null; // the next change starts a new step instead of merging into the previous one
+            }
         }
         else
         {

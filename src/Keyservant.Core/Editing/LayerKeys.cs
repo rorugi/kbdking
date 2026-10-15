@@ -65,6 +65,15 @@ public static class LayerKeys
             throw new InvalidOperationException("Right Alt is the AltGr key of this layout. Remove the AltGr characters or pick another key.");
 
         var previous = extended ? layout.ScanCodes.E0.GetValueOrDefault((byte)scanCode, ScanCodeTarget.None) : layout.ScanCodes[scanCode];
+        if (Find(layout).FirstOrDefault(k => k.ScanCode == scanCode && k.Extended == extended) is { } existing)
+        {
+            // Already a layer key: just switch it to the new layer.
+            layout.Modifiers.VkToBits.RemoveAll(b => b.VirtualKey == existing.VirtualKey);
+            layout.Modifiers.VkToBits.Add(new VkModifierBit(existing.VirtualKey, layer));
+            layout.Modifiers.EnsureColumn(new ShiftState(layer));
+            if (withShift) layout.Modifiers.EnsureColumn(new ShiftState(layer | ModifierBits.Shift));
+            return null;
+        }
         var used = layout.ScanCodes.Normal.Select(t => t.VirtualKey).Concat(layout.ScanCodes.E0.Values.Select(t => t.VirtualKey))
             .Concat(layout.Keys.Select(k => k.VirtualKey)).Concat(layout.Modifiers.VkToBits.Select(b => b.VirtualKey)).ToHashSet();
         var vk = Candidates.FirstOrDefault(c => !used.Contains(c));
@@ -85,12 +94,27 @@ public static class LayerKeys
             : $"The key was {name} before.";
     }
 
-    /// <summary>Turns a layer key back into the key it is on a standard keyboard. The layer's characters stay.</summary>
+    /// <summary>
+    /// Turns a layer key back into a normal key. The layer's characters stay. The key gets back the virtual key
+    /// whose characters became unreachable when it was made a layer key, or else what it is on a standard keyboard.
+    /// </summary>
     public static void Remove(KeyboardLayout layout, LayerKey key)
     {
         layout.Modifiers.VkToBits.RemoveAll(b => b.VirtualKey == key.VirtualKey);
-        var standard = LayoutTemplates.Create("en-US").ScanCodes;
+        var sent = layout.ScanCodes.Normal.Select(t => t.VirtualKey).Concat(layout.ScanCodes.E0.Values.Select(t => t.VirtualKey)).ToHashSet();
+        var templateId = LayoutTemplates.All.FirstOrDefault(t => t.Id.Equals(layout.Metadata.Locale, StringComparison.OrdinalIgnoreCase))?.Id
+            ?? (layout.Metadata.Locale.StartsWith("de", StringComparison.OrdinalIgnoreCase) ? "de-DE" : "en-US");
+        var standard = LayoutTemplates.Create(templateId).ScanCodes;
         var original = key.Extended ? standard.E0.GetValueOrDefault((byte)key.ScanCode, ScanCodeTarget.None) : standard[key.ScanCode];
+
+        // Character keys that no physical key sends any more: one of them is what this key typed before.
+        var orphans = layout.Keys.Where(k => !k.IsEmpty && !sent.Contains(k.VirtualKey) && !VirtualKeys.IsImplicitControlKey(k.VirtualKey)
+            && k.VirtualKey != VirtualKeys.Decimal).Select(k => k.VirtualKey).ToList();
+        byte? restore = orphans.Contains(original.VirtualKey) ? original.VirtualKey
+            : !original.IsNone && !sent.Contains(original.VirtualKey) ? null
+            : orphans.Count > 0 ? orphans[0] : null;
+        if (restore is { } vk && vk != original.VirtualKey)
+            original = new ScanCodeTarget(vk, key.Extended ? ScanCodeFlags.Ext : ScanCodeFlags.None);
         if (key.Extended)
         {
             if (original.IsNone) layout.ScanCodes.E0.Remove((byte)key.ScanCode);

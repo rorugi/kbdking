@@ -4,6 +4,9 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using System.Text.RegularExpressions;
 using Keyservant.Binary.Packaging;
 using Keyservant.Platform.Native;
 using Microsoft.Win32;
@@ -115,19 +118,27 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
             {
                 if (existing.GetValue(MarkerValue) is null)
                     throw new LayoutSystemException($"Layout ID {klid} belongs to a Windows layout; Keyservant won't overwrite it.");
+                if (existing.GetValue("Layout File") is string file && !file.Equals(package.DllFileName, StringComparison.OrdinalIgnoreCase))
+                    throw new LayoutSystemException($"Layout ID {klid} belongs to another installed layout ({existing.GetValue("Layout Text")}, {file}). " +
+                        "If this file is a copy meant as a separate layout, remove its \"layoutId\" and install again.");
             }
         }
+        var owner = FindLayoutUsingFile(root, package.DllFileName);
+        if (klid is null && owner is not null && IsKeyservantLayout(root, owner) && owner.EndsWith(package.LanguageId.ToString("X4", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase))
+            klid = owner.ToUpperInvariant(); // the same layout again (e.g. an installer run twice, or an update): update it in place
         klid ??= AllocateKlid(root, package.LanguageId);
 
         // Never overwrite a DLL that belongs to another layout.
-        var owner = FindLayoutUsingFile(root, package.DllFileName);
         if (owner is not null && !owner.Equals(klid, StringComparison.OrdinalIgnoreCase))
             throw new LayoutSystemException($"{package.DllFileName} is already used by layout {owner}. Choose a different DLL name.");
         if (owner is null && File.Exists(Path.Combine(_system32, package.DllFileName)))
             throw new LayoutSystemException($"{package.DllFileName} already exists in System32 and isn't a Keyservant layout. Choose a different DLL name.");
 
         // System32 gets the DLL of the machine's own architecture; SysWOW64 the 32-bit one.
-        var native = RuntimeInformation.OSArchitecture == Architecture.Arm64 && package.DllArm64 is not null ? package.DllArm64 : package.DllX64;
+        var arm64 = RuntimeInformation.OSArchitecture == Architecture.Arm64;
+        if (arm64 && package.DllArm64 is null)
+            throw new LayoutSystemException("This PC runs Windows on ARM, but the package has no ARM64 DLL. Build it again without --no-arm64.");
+        var native = arm64 ? package.DllArm64! : package.DllX64;
         CopyDll(native, Path.Combine(_system32, package.DllFileName));
         if (package.DllWow64 is not null && Directory.Exists(_sysWow64))
             CopyDll(package.DllWow64, Path.Combine(_sysWow64, package.DllFileName));
@@ -142,6 +153,7 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
             key.SetValue(MarkerValue, package.Version);
             key.DeleteValue(TemporaryValue, throwOnMissingValue: false);
         }
+        DeleteCleanupTask(klid); // a permanent install replaces a test install
 
         SavePackage(klid, package);
         var installed = GetLayouts().First(l => l.Klid.Equals(klid, StringComparison.OrdinalIgnoreCase));
@@ -179,6 +191,7 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
         DeleteFile(Path.Combine(_sysWow64, layout.LayoutFile));
         var stored = Path.Combine(_store, layout.Klid);
         if (Directory.Exists(stored)) Directory.Delete(stored, recursive: true);
+        if (layout.TemporaryUntil is not null) DeleteCleanupTask(layout.Klid);
     }
 
     public RepairReport Repair()
@@ -194,6 +207,11 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
             foreach (var dir in Directory.GetDirectories(_store))
             {
                 var klid = Path.GetFileName(dir);
+                if (!Regex.IsMatch(klid, "^[Aa][0-9A-Fa-f]{7}$"))
+                {
+                    report.Problems.Add($"Ignored {dir}: not a Keyservant layout folder.");
+                    continue;
+                }
                 var packagePath = Path.Combine(dir, PackageFileName);
                 if (!File.Exists(packagePath)) continue;
                 LayoutPackage package;
@@ -249,7 +267,7 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
         {
             key?.SetValue(TemporaryValue, until.ToString("O", CultureInfo.InvariantCulture));
         }
-        ScheduleCleanup(installed.Klid, until, cleanupExecutable);
+        ScheduleCleanup(installed.Klid, until, SecureExecutable(cleanupExecutable));
         return installed with { TemporaryUntil = until };
     }
 
@@ -284,7 +302,8 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
     /// </summary>
     private static void ScheduleCleanup(string klid, DateTimeOffset at, string executable)
     {
-        var start = at.ToLocalTime().ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
+        // UTC with "Z": the task fires at the right moment even if the time zone or daylight saving time changes.
+        var start = at.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss'Z'", CultureInfo.InvariantCulture);
         var xml = $$"""
             <?xml version="1.0" encoding="UTF-16"?>
             <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -300,7 +319,7 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
               <Actions Context="System"><Exec><Command>{{SecurityElement.Escape(executable)}}</Command><Arguments>cleanup</Arguments></Exec></Actions>
             </Task>
             """;
-        var file = Path.Combine(Path.GetTempPath(), $"keyservant-task-{klid}.xml");
+        var file = Path.Combine(Path.GetTempPath(), $"keyservant-task-{Guid.NewGuid():N}.xml");
         File.WriteAllText(file, xml, Encoding.Unicode);
         try
         {
@@ -390,13 +409,72 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Loaded by a running process: delete at the next restart.
-            Kernel32.MoveFileEx(path, null, Kernel32.MoveFileDelayUntilReboot);
+            // Loaded by a running process. Move it out of the way first (a loaded DLL can be renamed), so the
+            // name is free for a reinstall before the restart, then delete the renamed file at the next restart.
+            var doomed = path;
+            try
+            {
+                doomed = $"{path}.{Guid.NewGuid():N}.delete";
+                File.Move(path, doomed);
+            }
+            catch (Exception moveError) when (moveError is IOException or UnauthorizedAccessException)
+            {
+                doomed = path;
+            }
+            if (!Kernel32.MoveFileEx(doomed, null, Kernel32.MoveFileDelayUntilReboot))
+                throw new LayoutSystemException($"{Path.GetFileName(path)} is in use and could not be removed; close the apps using the layout and try again.");
         }
+    }
+
+    private static bool IsKeyservantLayout(RegistryKey root, string klid)
+    {
+        using var key = root.OpenSubKey(klid);
+        return key?.GetValue(MarkerValue) is not null;
+    }
+
+    /// <summary>
+    /// Creates %ProgramData%\Keyservant with permissions for administrators and SYSTEM only (users may read).
+    /// The stored packages are installed into System32 by repair, so ordinary users must not be able to add any.
+    /// </summary>
+    private void EnsureSecureStore()
+    {
+        var root = Path.GetDirectoryName(_store)!;
+        var security = new DirectorySecurity();
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        var inherit = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
+        security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null), FileSystemRights.FullControl, inherit, PropagationFlags.None, AccessControlType.Allow));
+        security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null), FileSystemRights.FullControl, inherit, PropagationFlags.None, AccessControlType.Allow));
+        security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null), FileSystemRights.ReadAndExecute, inherit, PropagationFlags.None, AccessControlType.Allow));
+        var info = new DirectoryInfo(root);
+        if (!info.Exists) info.Create(security);
+        else info.SetAccessControl(security);
+        Directory.CreateDirectory(_store);
+    }
+
+    /// <summary>
+    /// The cleanup task runs as SYSTEM, so it must start an executable ordinary users can't replace. Copies the
+    /// given executable into the protected store unless it already lives in a protected folder.
+    /// </summary>
+    private string SecureExecutable(string executable)
+    {
+        var full = Path.GetFullPath(executable);
+        string[] protectedRoots = [Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), Environment.GetFolderPath(Environment.SpecialFolder.Windows)];
+        if (protectedRoots.Any(r => r.Length > 0 && full.StartsWith(r + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))) return full;
+        EnsureSecureStore();
+        var dir = Path.Combine(Path.GetDirectoryName(_store)!, "bin");
+        Directory.CreateDirectory(dir);
+        var target = Path.Combine(dir, Path.GetFileName(full));
+        if (!File.Exists(target) || new FileInfo(target).Length != new FileInfo(full).Length || File.GetLastWriteTimeUtc(target) < File.GetLastWriteTimeUtc(full))
+        {
+            try { File.Copy(full, target, overwrite: true); }
+            catch (IOException) when (File.Exists(target)) { /* in use by a running cleanup; the existing copy works too */ }
+        }
+        return target;
     }
 
     private void SavePackage(string klid, LayoutPackage package)
     {
+        EnsureSecureStore();
         var dir = Path.Combine(_store, klid);
         Directory.CreateDirectory(dir);
         using var s = File.Create(Path.Combine(dir, PackageFileName));

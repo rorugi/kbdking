@@ -43,13 +43,31 @@ public static class ComposeCompiler
     public static ComposeCompilation Compile(KeyboardLayout layout)
     {
         if (layout.Compose is not { } compose || compose.Sequences.Count == 0) return new ComposeCompilation(layout, [], []);
+        if (IsCompiled(layout, compose)) return new ComposeCompilation(layout, [], []);
 
         var warnings = new List<string>();
         var errors = new List<string>();
         var result = layout.Clone();
 
+        // 0. The compose key must not take over a key the layout still needs.
+        var previous = compose.Extended ? layout.ScanCodes.E0.GetValueOrDefault((byte)compose.ScanCode, ScanCodeTarget.None) : layout.ScanCodes[compose.ScanCode];
+        if (!previous.IsNone)
+        {
+            if (layout.Modifiers.VkToBits.Any(b => b.VirtualKey == previous.VirtualKey))
+                errors.Add($"The compose key ({compose.KeyText}) is also a layer or modifier key of this layout. Choose another compose key.");
+            else if (compose.Extended && compose.ScanCode == 0x38 && layout.Flags.HasFlag(LocaleFlags.AltGr)
+                     && layout.Keys.Any(k => k.Outputs.Keys.Any(s => s.Bits.HasFlag(ModifierBits.AltGr))))
+                errors.Add("Right Alt is the AltGr key of this layout, so it can't be the compose key. Choose another key.");
+            else if (layout.FindKey(previous.VirtualKey) is { IsEmpty: false } typed && !VirtualKeys.IsImplicitControlKey(previous.VirtualKey))
+                warnings.Add($"The compose key ({compose.KeyText}) typed characters before (virtual key {typed.Name}); they can no longer be typed.");
+        }
+        if (layout.FindDeadKey(compose.Accent) is not null || layout.Keys.Any(k => k.Outputs.Values.Any(o => o.Text.Contains(compose.Accent))))
+            errors.Add($"The compose accent '{compose.Accent}' (U+{(int)compose.Accent:X4}) is already used by the layout. Pick a character the layout doesn't type.");
+        if (errors.Count > 0) return new ComposeCompilation(layout, warnings, errors);
+
         // 1. A free virtual key for the compose key.
         var used = new HashSet<byte>(result.Keys.Select(k => k.VirtualKey));
+        foreach (var b in result.Modifiers.VkToBits) used.Add(b.VirtualKey);
         foreach (var t in result.ScanCodes.Normal) used.Add(t.VirtualKey);
         foreach (var t in result.ScanCodes.E0.Values) used.Add(t.VirtualKey);
         var vk = CandidateVks.FirstOrDefault(v => !used.Contains(v));
@@ -106,9 +124,9 @@ public static class ComposeCompiler
                 warnings.Add($"Skipped \"{seq.Keys}\" → \"{seq.Result}\": it is the start of longer sequences.");
                 continue;
             }
-            if (node.Result is { } existing && existing != seq.Result[0])
+            if (node.Result is { } existing)
             {
-                warnings.Add($"\"{seq.Keys}\" is defined twice (\"{existing}\" and \"{seq.Result}\"); keeping the first.");
+                if (existing != seq.Result[0]) warnings.Add($"\"{seq.Keys}\" is defined twice (\"{existing}\" and \"{seq.Result}\"); keeping the first.");
                 continue;
             }
             node.Result = seq.Result[0];
@@ -166,6 +184,14 @@ public static class ComposeCompiler
         }
 
         return new ComposeCompilation(result, warnings, errors) { CompiledSequences = compiled };
+    }
+
+    /// <summary>True for a layout that already went through <see cref="Compile"/> (its compose key types the compose accent).</summary>
+    private static bool IsCompiled(KeyboardLayout layout, ComposeDefinition compose)
+    {
+        var target = compose.Extended ? layout.ScanCodes.E0.GetValueOrDefault((byte)compose.ScanCode, ScanCodeTarget.None) : layout.ScanCodes[compose.ScanCode];
+        return !target.IsNone && layout.FindKey(target.VirtualKey)?.Outputs.GetValueOrDefault(ShiftState.Base) is { IsDead: true } o
+            && o.Accent == compose.Accent && layout.FindDeadKey(compose.Accent) is not null;
     }
 
     private static HashSet<char> TypeableCharacters(KeyboardLayout layout)

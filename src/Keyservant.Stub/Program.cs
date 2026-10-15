@@ -78,14 +78,20 @@ internal static class Program
     {
         var system = new WindowsLayoutSystem();
         var layout = system.GetLayouts().FirstOrDefault(l => l.IsCustom && l.LayoutFile.Equals(package.DllFileName, StringComparison.OrdinalIgnoreCase));
-        if (layout is null)
+        if (layout is not null) system.Uninstall(layout.Klid);
+
+        // Remove the "Apps & features" entry and the stored uninstaller even if the layout was already removed
+        // another way (e.g. with 'keyservant uninstall'); otherwise the entry could never be removed.
+        var uninstallDir = Path.GetDirectoryName(Path.GetFullPath(Environment.ProcessPath ?? ""));
+        var klid = layout?.Klid
+            ?? (uninstallDir is not null && Path.GetFileName(Path.GetDirectoryName(uninstallDir)) == "Uninstall" ? Path.GetFileName(uninstallDir) : null);
+        if (klid is not null)
         {
-            if (!silent) Console.WriteLine($"\"{package.Name}\" is not installed.");
-            return 0;
+            Registry.LocalMachine.DeleteSubKeyTree($@"{UninstallRoot}\Keyservant-{klid}", throwOnMissingSubKey: false);
+            var stored = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Keyservant", "Uninstall", klid);
+            RebootCleanup.DeleteFolder(stored);
         }
-        system.Uninstall(layout.Klid);
-        Registry.LocalMachine.DeleteSubKeyTree($@"{UninstallRoot}\Keyservant-{layout.Klid}", throwOnMissingSubKey: false);
-        if (!silent) Console.WriteLine($"Removed \"{layout.Name}\".");
+        if (!silent) Console.WriteLine(layout is null ? $"\"{package.Name}\" was not installed any more; removed its entry." : $"Removed \"{layout.Name}\".");
         return 0;
     }
 

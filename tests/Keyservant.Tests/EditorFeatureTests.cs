@@ -320,4 +320,140 @@ public partial class PresentationTests
         Assert.Empty(editor.ShiftStateEditor.LayerKeyRows);
         Assert.Contains(editor.Issues, i => i.Code == "KS090");
     }
+
+    // ---------------------------------------------------------------- review fixes
+
+    [Fact]
+    public async Task New_asks_before_discarding_changes()
+    {
+        var dialogs = new FakeDialogs { ConfirmResult = false };
+        var editor = new EditorViewModel(dialogs, new FakePrivileged());
+        editor.LayoutName = "Changed";
+        editor.NewCommand.Execute("en-US");
+        await WaitUntil(() => editor.NewCommand.CanExecute(null));
+        Assert.Equal("Changed", editor.LayoutName);
+        dialogs.ConfirmResult = true;
+        editor.NewCommand.Execute("en-US");
+        await WaitUntil(() => editor.LayoutName != "Changed");
+        Assert.NotEqual("Changed", editor.LayoutName);
+    }
+
+    [Fact]
+    public async Task Opening_a_broken_file_from_the_manager_reports_instead_of_crashing()
+    {
+        var dialogs = new FakeDialogs();
+        var editor = new EditorViewModel(dialogs, new FakePrivileged());
+        Assert.False(await editor.OpenFileInteractiveAsync(Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.dll")));
+        Assert.NotEmpty(dialogs.Messages);
+    }
+
+    [Fact]
+    public void Undo_keeps_the_layout_id_assigned_by_installing()
+    {
+        var editor = NewEditor();
+        editor.LayoutName = "Edited";
+        editor.Layout.Metadata.LayoutId = "A0010C07"; // what an install assigns
+        editor.UndoCommand.Execute(null);
+        Assert.Equal("A0010C07", editor.LayoutId);
+    }
+
+    [Fact]
+    public void Adding_a_compose_sequence_is_an_undoable_change()
+    {
+        var editor = NewEditor();
+        editor.Compose.AddCommand.Execute(null);
+        Assert.True(editor.Compose.IsEnabled);
+        Assert.True(editor.IsDirty);
+        Assert.True(editor.UndoCommand.CanExecute(null));
+        Assert.NotNull(editor.Compose.SelectedKey);
+    }
+
+    [Fact]
+    public void Typing_into_a_new_shift_state_updates_altgr_and_the_columns()
+    {
+        var editor = NewEditor();
+        editor.New("en-US");
+        var columns = editor.ShiftStateEditor.Columns.Count;
+        var raised = new List<string?>();
+        editor.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        Key(editor, (byte)'A').SelectCommand.Execute(null);
+        editor.KeyEditor!.Rows.First(r => r.State == ShiftState.AltGr).Text = "ā";
+        Assert.True(editor.AltGrFlag);
+        Assert.Contains(nameof(EditorViewModel.AltGrFlag), raised);
+        Assert.Equal(columns + 1, editor.ShiftStateEditor.Columns.Count);
+    }
+
+    [Fact]
+    public void Edits_on_the_ligature_tab_refresh_the_key_editor()
+    {
+        var editor = NewEditor();
+        Key(editor, (byte)'Q').SelectCommand.Execute(null);
+        editor.Ligatures.NewKey = "q";
+        editor.Ligatures.NewState = editor.ShiftStates.First(s => s.State == ShiftState.Base);
+        editor.Ligatures.NewText = "ng";
+        editor.Ligatures.AddCommand.Execute(null);
+        Assert.Equal("ng", editor.KeyEditor!.Rows.First(r => r.State == ShiftState.Base).Text);
+    }
+
+    [Fact]
+    public void Unfinished_rows_survive_changes_on_other_tabs()
+    {
+        var editor = NewEditor();
+        editor.Tests.AddCommand.Execute(null);
+        editor.Tests.Tests[^1].Expect = "ṭ"; // keys not entered yet
+        editor.DeadKeys.AddCommonCommand.Execute("\u0323");
+        var dot = editor.DeadKeys.DeadKeys.First(d => d.AccentCode == "U+0323");
+        dot.AddEntryCommand.Execute(null);
+        var pending = dot.Entries[^1];
+        pending.Base = "";
+        editor.ShiftStateEditor.AddKana = true;
+        editor.ShiftStateEditor.AddCommand.Execute(null); // reloads every tab
+        Assert.Contains(editor.Tests.Tests, t => t.Expect == "ṭ" && t.Keys == "");
+        Assert.Contains(editor.DeadKeys.DeadKeys.First(d => d.AccentCode == "U+0323").Entries, e => e.Base == "");
+    }
+
+    [Fact]
+    public void Compare_follows_later_edits()
+    {
+        var editor = NewEditor();
+        editor.Compare.CompareWith(editor.Layout.Clone(), "the start");
+        Assert.Empty(editor.Compare.Changes);
+        Key(editor, (byte)'W').SelectCommand.Execute(null);
+        editor.KeyEditor!.Rows.First(r => r.State == ShiftState.AltGr).Text = "ŵ";
+        Assert.Contains(editor.Compare.Changes, c => c.VirtualKey == (byte)'W');
+        Assert.True(Key(editor, (byte)'W').IsHighlighted);
+    }
+
+    [Fact]
+    public void Preview_lets_ctrl_shortcuts_through_and_forgets_layer_keys_on_focus_loss()
+    {
+        var editor = NewEditor();
+        Assert.False(editor.HandlePreviewKey(0x2C, false, shift: false, ctrl: true, alt: false, capsLock: false));
+        editor.ShiftStateEditor.AddLayerKey(0x3A, false, ModifierBits.LayerA);
+        editor.HandlePreviewKey(0x3A, false, false, false, false, false);
+        editor.ResetPreviewKeys();
+        editor.HandlePreviewKey(0x1E, false, false, false, false, false);
+        Assert.Equal("a", editor.PreviewText);
+    }
+
+    [Fact]
+    public async Task Saving_enables_compare_with_the_saved_version()
+    {
+        var dialogs = new FakeDialogs();
+        var editor = new EditorViewModel(dialogs, new FakePrivileged());
+        var raised = 0;
+        editor.Compare.CompareWithSavedCommand.CanExecuteChanged += (_, _) => raised++;
+        var file = Path.Combine(Path.GetTempPath(), $"ks-{Guid.NewGuid():N}.keyservant");
+        try
+        {
+            dialogs.NextFile = file;
+            Assert.True(await editor.SaveAsync(saveAs: true));
+            Assert.True(raised > 0);
+            Assert.True(editor.Compare.CompareWithSavedCommand.CanExecute(null));
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
 }

@@ -218,7 +218,20 @@ public sealed class KeyservantFormat : ILayoutFormat
 
     public static KeyboardLayout Parse(string json, ConversionReport? report = null)
     {
-        report ??= new ConversionReport();
+        try
+        {
+            return ParseCore(json, report ?? new ConversionReport());
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or FormatException or NullReferenceException
+                                       or KeyNotFoundException or IndexOutOfRangeException or OverflowException)
+        {
+            // Wrong JSON types (a number where a string belongs, null entries, duplicate properties...).
+            throw new LayoutFormatException($"The file is not a valid Keyservant layout: {ex.Message}", ex);
+        }
+    }
+
+    private static KeyboardLayout ParseCore(string json, ConversionReport report)
+    {
         JsonNode? rootNode;
         try
         {
@@ -252,7 +265,9 @@ public sealed class KeyservantFormat : ILayoutFormat
             var i = 0;
             foreach (var node in keys)
             {
-                layout.Keys.Add(ReadKey(node as JsonObject ?? throw Error($"keys[{i}] must be an object."), i));
+                var key = ReadKey(node as JsonObject ?? throw Error($"keys[{i}] must be an object."), i);
+                if (layout.FindKey(key.VirtualKey) is not null) throw Error($"keys[{i}]: virtual key {key.Name} is listed twice.");
+                layout.Keys.Add(key);
                 i++;
             }
         }
@@ -350,6 +365,7 @@ public sealed class KeyservantFormat : ILayoutFormat
                     var state = ParseState(name, "modifiers.columns");
                     while (t.ModNumber.Count <= state.Value) t.ModNumber.Add(ModifierTable.Invalid);
                     if (t.ModNumber[state.Value] != ModifierTable.Invalid) throw Error($"Shift state \"{name}\" is listed twice in modifiers.columns.");
+                    if (c >= ModifierTable.Invalid) throw Error($"A layout can have at most {ModifierTable.Invalid} columns.");
                     t.ModNumber[state.Value] = (byte)c;
                 }
             }
@@ -357,6 +373,7 @@ public sealed class KeyservantFormat : ILayoutFormat
         if (max is { } m)
         {
             if (m + 1 < t.ModNumber.Count) throw Error("modifiers.maxModBits is smaller than the highest shift state used.");
+            if (m is < 0 or > 0xFF) throw Error("modifiers.maxModBits must be between 0 and 255.");
             while (t.ModNumber.Count <= m) t.ModNumber.Add(ModifierTable.Invalid);
         }
         return t;
@@ -367,6 +384,7 @@ public sealed class KeyservantFormat : ILayoutFormat
         var m = new ScanCodeMap();
         if (o is null) return m;
         var count = Int(o, "count") ?? 0;
+        if (count is < 0 or > 0x100) throw Error("scanCodes.count must be between 0 and 256.");
         for (var i = 0; i < count; i++) m.Normal.Add(ScanCodeTarget.None);
         if (o["normal"] is JsonObject normal)
         {

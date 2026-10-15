@@ -29,7 +29,7 @@ public sealed class ComposeDefinition
         var t = text.Trim().ToUpperInvariant().Replace("0X", "", StringComparison.Ordinal);
         var extended = t.StartsWith("E0", StringComparison.Ordinal) && t.Length > 2;
         if (extended) t = t[2..].Trim();
-        return int.TryParse(t, System.Globalization.NumberStyles.HexNumber, null, out var sc) && sc is > 0 and < 0x100
+        return int.TryParse(t, System.Globalization.NumberStyles.HexNumber, null, out var sc) && sc is > 0 and < 0x80
             ? (sc, extended)
             : throw new FormatException($"Invalid compose key '{text}' (expected a scan code such as 3A or E0 5D).");
     }

@@ -66,24 +66,34 @@ public static class XComposeFile
         {
             sb.Append("<Multi_key>");
             foreach (var c in s.Keys) sb.Append(" <").Append(CharToKeysym(c)).Append('>');
-            sb.Append(" : \"").Append(s.Result.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)).Append('"');
-            if (s.Result.Length > 0)
-            {
-                var cp = char.ConvertToUtf32(s.Result, 0);
-                sb.Append(CultureInfo.InvariantCulture, $" U{cp:X4}");
-            }
-            sb.Append('\n');
+            sb.Append(" : ").Append(FormatResult(s.Result)).Append('\n');
         }
         return sb.ToString();
     }
 
+    /// <summary>The right-hand side of a compose line: the quoted, escaped result and its keysym, e.g. <c>"\"" U0022</c>.</summary>
+    internal static string FormatResult(string result)
+    {
+        var sb = new StringBuilder("\"");
+        sb.Append(result.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)).Append('"');
+        if (result.Length > 0 && (!char.IsSurrogate(result[0]) || char.IsSurrogatePair(result, 0)))
+            sb.Append(CultureInfo.InvariantCulture, $" U{char.ConvertToUtf32(result, 0):X4}");
+        return sb.ToString();
+    }
+
+    /// <summary>The ':' between the keys and the result: outside quotes and outside &lt;keysym&gt; brackets.</summary>
     private static int FindColon(string line)
     {
         var inQuote = false;
+        var inAngle = false;
         for (var i = 0; i < line.Length; i++)
         {
-            if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) inQuote = !inQuote;
-            if (!inQuote && line[i] == ':' && line.IndexOf('>', i) < 0) return i;
+            var c = line[i];
+            if (c == '"' && (i == 0 || line[i - 1] != '\\')) inQuote = !inQuote;
+            else if (inQuote) continue;
+            else if (c == '<') inAngle = true;
+            else if (c == '>') inAngle = false;
+            else if (c == ':' && !inAngle) return i;
         }
         return -1;
     }

@@ -270,7 +270,7 @@ public sealed class ScanCodesViewModel : ObservableObject
         if (row.Extended) layout.ScanCodes.E0[(byte)row.ScanCode] = target;
         else layout.ScanCodes.Set(row.ScanCode, target);
         _editor.MarkChanged($"scan:{row.Code}");
-        _editor.RefreshKeyboard();
+        _editor.RefreshSelectedKey();
     }
 
     internal void Remove(ScanCodeRowViewModel row)
@@ -279,7 +279,7 @@ public sealed class ScanCodesViewModel : ObservableObject
         _editor.Layout.ScanCodes.E0.Remove((byte)row.ScanCode);
         _editor.MarkChanged();
         Load();
-        _editor.RefreshKeyboard();
+        _editor.RefreshSelectedKey();
     }
 
     private void Add()
@@ -541,7 +541,7 @@ public sealed class LigaturesViewModel : ObservableObject
         if (text.Length > Keyservant.Core.Validation.LayoutValidator.MaxLigature) return $"At most {Keyservant.Core.Validation.LayoutValidator.MaxLigature} UTF-16 units.";
         _editor.Layout.SetOutput(row.VirtualKey, row.State, KeyOutput.Of(text));
         _editor.MarkChanged($"lig:{row.VirtualKey}:{row.State.Value}");
-        _editor.RefreshKeyboard();
+        _editor.RefreshSelectedKey();
         return text.Length > Keyservant.Core.Validation.LayoutValidator.RecommendedMaxLigature ? "Longer than 4 units: works in Windows, but MSKLC can't open it." : null;
     }
 
@@ -549,7 +549,7 @@ public sealed class LigaturesViewModel : ObservableObject
     {
         _editor.Layout.SetOutput(row.VirtualKey, row.State, null);
         _editor.MarkChanged();
-        _editor.RefreshKeyboard();
+        _editor.RefreshSelectedKey();
         Load();
     }
 
@@ -563,7 +563,7 @@ public sealed class LigaturesViewModel : ObservableObject
         Message = $"{VirtualKeys.GetName(vk)} ({state.DisplayName}) now types {text}.";
         NewText = "";
         _editor.MarkChanged();
-        _editor.RefreshKeyboard();
+        _editor.RefreshSelectedKey();
         Load();
     }
 

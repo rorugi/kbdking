@@ -13,13 +13,20 @@ public sealed class DeadKeyEntryViewModel : ObservableObject, ICharacterTarget
     private bool _chained;
 
     internal DeadKeyEntryViewModel(DeadKeyViewModel owner, DeadKeyEntry entry)
+        : this(owner, OutputRowViewModel.Format(entry.Base.ToString()), OutputRowViewModel.Format(entry.Result.ToString()), entry.Chained)
+    {
+    }
+
+    internal DeadKeyEntryViewModel(DeadKeyViewModel owner, string baseText, string resultText, bool chained)
     {
         _owner = owner;
-        _base = OutputRowViewModel.Format(entry.Base.ToString());
-        _result = OutputRowViewModel.Format(entry.Result.ToString());
-        _chained = entry.Chained;
+        _base = baseText;
+        _result = resultText;
+        _chained = chained;
         RemoveCommand = new RelayCommand(() => _owner.Remove(this));
     }
+
+    internal (string Base, string Result, bool Chained) RawText => (_base, _result, _chained);
 
     public ICommand RemoveCommand { get; }
 
@@ -139,8 +146,15 @@ public sealed class DeadKeysViewModel : ObservableObject
     internal void Load(KeyboardLayout layout)
     {
         var selected = _selected?.AccentChar;
+        // Rows still being typed (not valid yet, so not in the layout) survive the reload.
+        var unfinished = DeadKeys.GroupBy(d => d.AccentChar).ToDictionary(g => g.Key, g => g.SelectMany(d => d.Entries.Where(e => e.ToEntry() is null).Select(e => e.RawText)).ToList());
         DeadKeys.Clear();
-        foreach (var d in layout.DeadKeys) DeadKeys.Add(new DeadKeyViewModel(this, d));
+        foreach (var d in layout.DeadKeys)
+        {
+            var vm = new DeadKeyViewModel(this, d);
+            foreach (var (b, r, c) in unfinished.GetValueOrDefault(d.Accent) ?? []) vm.Entries.Add(new DeadKeyEntryViewModel(vm, b, r, c));
+            DeadKeys.Add(vm);
+        }
         Selected = DeadKeys.FirstOrDefault(d => d.AccentChar == selected) ?? DeadKeys.FirstOrDefault();
     }
 

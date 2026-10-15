@@ -42,9 +42,12 @@ public static class LayoutDiff
         Add("Metadata", "author", mb.Author, ma.Author);
         Add("Metadata", "description", mb.Description, ma.Description);
         Add("Flags", "flags", before.Flags.ToString(), after.Flags.ToString());
+        Add("Metadata", "layout ID", mb.LayoutId, ma.LayoutId);
         Add("Shift states", "columns",
             string.Join(", ", before.Modifiers.Columns.Select(c => c.Name)),
             string.Join(", ", after.Modifiers.Columns.Select(c => c.Name)));
+        static string ModifierKeys(KeyboardLayout l) => string.Join(", ", l.Modifiers.VkToBits.Select(b => $"{VirtualKeys.GetName(b.VirtualKey)}={new ShiftState(b.Bits).Name}"));
+        Add("Shift states", "modifier keys", ModifierKeys(before), ModifierKeys(after));
 
         // Scan codes
         var maxScan = Math.Max(before.ScanCodes.Normal.Count, after.ScanCodes.Normal.Count);
@@ -108,6 +111,7 @@ public static class LayoutDiff
 
         // Compose
         Add("Compose", "key", before.Compose?.KeyText, after.Compose?.KeyText);
+        Add("Compose", "accent", before.Compose?.Accent.ToString(), after.Compose?.Accent.ToString());
         var seqB = before.Compose?.Sequences.GroupBy(s => s.Keys).ToDictionary(g => g.Key, g => g.First().Result) ?? [];
         var seqA = after.Compose?.Sequences.GroupBy(s => s.Keys).ToDictionary(g => g.Key, g => g.First().Result) ?? [];
         foreach (var k in seqB.Keys.Union(seqA.Keys).Order(StringComparer.Ordinal))

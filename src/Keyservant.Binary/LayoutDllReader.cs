@@ -37,8 +37,9 @@ public static class LayoutDllReader
     }
 
     /// <summary>Finds the address KbdLayerDescriptor returns by decoding its machine code.</summary>
-    internal static uint DecodeDescriptor(PeImage pe, uint fnRva)
+    internal static uint DecodeDescriptor(PeImage pe, uint fnRva, int jumps = 0)
     {
+        if (jumps > 4) throw Unsupported(); // jump thunks that lead nowhere (or in a loop)
         var code = pe.Read(fnRva, Math.Min(32, RemainingInSection(pe, fnRva)));
         if (code.Length < 8) throw Unsupported();
         switch (pe.Machine)
@@ -50,7 +51,7 @@ public static class LayoutDllReader
                 if (code[0] == 0xE9)
                 {
                     var target = (uint)((int)fnRva + 5 + BinaryPrimitives.ReadInt32LittleEndian(code[1..]));
-                    return DecodeDescriptor(pe, target);
+                    return DecodeDescriptor(pe, target, jumps + 1);
                 }
                 // lea rax, [rip + disp32]   (48 8D 05 disp32)
                 if (code.Length >= 7 && code[i] == 0x48 && code[i + 1] == 0x8D && code[i + 2] == 0x05)

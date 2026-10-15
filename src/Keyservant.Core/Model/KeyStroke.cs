@@ -109,9 +109,21 @@ public static class KeySequence
     public static string Format(IEnumerable<KeyStroke> strokes, KeyboardLayout layout)
     {
         var sb = new StringBuilder();
+        byte? composeVk = null;
+        if (layout.Compose is { } compose)
+        {
+            var compiled = Compose.ComposeCompiler.Compile(layout).Layout;
+            var t = compose.Extended ? compiled.ScanCodes.E0.GetValueOrDefault((byte)compose.ScanCode, ScanCodeTarget.None) : compiled.ScanCodes[compose.ScanCode];
+            if (!t.IsNone) composeVk = t.VirtualKey;
+        }
         foreach (var s in strokes)
         {
             if (sb.Length > 0) sb.Append(' ');
+            if (s.VirtualKey == composeVk && s.State.Bits is ModifierBits.None or ModifierBits.Shift && !s.CapsLock)
+            {
+                sb.Append("Compose");
+                continue;
+            }
             if (s.CapsLock) sb.Append("Caps+");
             if (s.State.Bits != ModifierBits.None) sb.Append(ModifierTokens(s.State)).Append('+');
             var key = layout.FindKey(s.VirtualKey);

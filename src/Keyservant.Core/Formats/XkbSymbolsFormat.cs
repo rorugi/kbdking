@@ -92,7 +92,7 @@ public sealed partial class XkbSymbolsFormat : ILayoutFormat
                 var isDeadKey = layout.Keys.Any(k => k.Outputs.Values.Any(o => o.IsDead && o.Accent == e.Base));
                 var step = prefix + " <" + (isDeadKey ? Sym(e.Base) : XComposeFile.CharToKeysym(e.Base)) + ">";
                 if (e.Chained) Expand(e.Result, step, depth + 1);
-                else sb.Append(step).Append(" : \"").Append(e.Result).Append(CultureInfo.InvariantCulture, $"\" U{(int)e.Result:X4}\n");
+                else sb.Append(step).Append(" : ").Append(XComposeFile.FormatResult(e.Result.ToString())).Append('\n');
             }
         }
         return sb.ToString();
@@ -125,6 +125,23 @@ public sealed partial class XkbSymbolsFormat : ILayoutFormat
     [GeneratedRegex(@"name\s*\[\s*Group1\s*\]\s*=\s*""(?<name>[^""]*)""")]
     private static partial Regex NameRegex();
 
+    [GeneratedRegex(@"symbols\s*\[\s*Group1\s*\]\s*=\s*\[(?<syms>[^\]]*)\]")]
+    private static partial Regex Group1SymbolsRegex();
+
+    /// <summary>True if the bracket at <paramref name="index"/> is part of a named attribute such as type[...] or actions[Group1] = [...].</summary>
+    private static bool IsAttributeList(string body, int index)
+    {
+        var i = index - 1;
+        while (i >= 0 && char.IsWhiteSpace(body[i])) i--;
+        if (i >= 0 && body[i] == '=')
+        {
+            i--;
+            while (i >= 0 && char.IsWhiteSpace(body[i])) i--;
+            return i >= 0 && body[i] == ']';   // something[GroupN] = [ ... ]
+        }
+        return i >= 0 && char.IsLetterOrDigit(body[i]); // type[GroupN], actions[...]
+    }
+
     public KeyboardLayout Read(Stream input, ConversionReport report)
     {
         using var reader = new StreamReader(input, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
@@ -133,11 +150,24 @@ public sealed partial class XkbSymbolsFormat : ILayoutFormat
 
     public static KeyboardLayout Parse(string text, ConversionReport report)
     {
+        try
+        {
+            return ParseCore(text, report);
+        }
+        catch (Exception ex) when (ex is ArgumentException or FormatException or IndexOutOfRangeException or InvalidOperationException)
+        {
+            throw new LayoutFormatException($"Invalid XKB symbols file: {ex.Message}", ex);
+        }
+    }
+
+    private static KeyboardLayout ParseCore(string text, ConversionReport report)
+    {
         // Strip comments, then use the first xkb_symbols block.
         text = Regex.Replace(text, @"//[^\n]*", "");
         var start = text.IndexOf("xkb_symbols", StringComparison.Ordinal);
         if (start < 0) throw new LayoutFormatException("No xkb_symbols block found.");
         var open = text.IndexOf('{', start);
+        if (open < 0) throw new LayoutFormatException("The xkb_symbols block has no '{'.");
         var depth = 0;
         var end = open;
         for (; end < text.Length; end++)
@@ -164,8 +194,11 @@ public sealed partial class XkbSymbolsFormat : ILayoutFormat
             if (target.IsNone) continue;
             var vk = target.Flags.HasFlag(ScanCodeFlags.Numpad) && entry.ScanCode == 0x53 ? VirtualKeys.Decimal : target.VirtualKey;
             var body = km.Groups["body"].Value;
-            // The symbol list is the last [...] in the body ("type[Group1]" also uses brackets).
-            var symsMatch = SymbolsRegex().Matches(body).LastOrDefault(m => !m.Groups["syms"].Value.Trim().StartsWith("Group", StringComparison.Ordinal));
+            // The symbols of group 1: "symbols[Group1] = [...]" if present, otherwise the first bare [...]
+            // ("type[Group1]", "actions[...]" and later groups use brackets too).
+            var symsMatch = Group1SymbolsRegex().Match(body) is { Success: true } g1 ? g1
+                : SymbolsRegex().Matches(body).FirstOrDefault(m => !m.Groups["syms"].Value.Trim().StartsWith("Group", StringComparison.Ordinal)
+                    && !IsAttributeList(body, m.Index));
             if (symsMatch is null) continue;
             var syms = symsMatch.Groups["syms"].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             var key = layout.GetOrAddKey(vk);
@@ -210,9 +243,10 @@ public sealed partial class XkbSymbolsFormat : ILayoutFormat
             unknown.Add(sym);
             return null;
         }
-        if (sym.Length > 1 && sym[0] == 'U' && int.TryParse(sym.AsSpan(1), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var cp) && cp is > 0 and <= 0x10FFFF)
+        static bool Valid(int c) => c is > 0 and <= 0x10FFFF and not (>= 0xD800 and <= 0xDFFF);
+        if (sym.Length > 1 && sym[0] == 'U' && int.TryParse(sym.AsSpan(1), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var cp) && Valid(cp))
             return KeyOutput.Of(char.ConvertFromUtf32(cp));
-        if (sym.StartsWith("0x", StringComparison.OrdinalIgnoreCase) && int.TryParse(sym.AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var raw) && raw is >= 0x01000000 and <= 0x0110FFFF)
+        if (sym.StartsWith("0x", StringComparison.OrdinalIgnoreCase) && int.TryParse(sym.AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var raw) && raw is >= 0x01000000 and <= 0x0110FFFF && Valid(raw - 0x01000000))
             return KeyOutput.Of(char.ConvertFromUtf32(raw - 0x01000000));
         if (XComposeFile.KeysymToChar(sym) is { } c) return KeyOutput.Of(c);
         unknown.Add(sym);

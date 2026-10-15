@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Keyservant.Core.Formats;
 using Keyservant.Core.Model;
@@ -98,13 +99,31 @@ public sealed class LayoutPackage
             var name = r.ReadString();
             var length = r.ReadInt32();
             if (length is < 0 or > 64 * 1024 * 1024) throw new InvalidDataException("Corrupt layout package.");
-            entries[name] = r.ReadBytes(length);
+            var data = r.ReadBytes(length);
+            if (data.Length != length) throw new InvalidDataException("The layout package is truncated.");
+            entries[name] = data;
         }
 
+        try
+        {
+            return FromEntries(entries);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or JsonException or NullReferenceException or InvalidOperationException or FormatException or ArgumentException)
+        {
+            throw new InvalidDataException($"Corrupt layout package: {ex.Message}", ex);
+        }
+    }
+
+    private static LayoutPackage FromEntries(Dictionary<string, byte[]> entries)
+    {
         var manifest = JsonNode.Parse(entries[ManifestEntry]) as JsonObject ?? throw new InvalidDataException("Missing manifest.");
         var dll = manifest["dllFileName"]!.GetValue<string>();
-        if (dll.Contains('/') || dll.Contains('\\') || dll.Contains("..", StringComparison.Ordinal))
+        // Only plain names like kbdiast.dll: no paths, drive letters or alternate data streams.
+        if (!System.Text.RegularExpressions.Regex.IsMatch(dll, "^[A-Za-z0-9_]{1,8}\\.[Dd][Ll][Ll]$"))
             throw new InvalidDataException("Invalid DLL name in package.");
+        var layoutId = manifest["layoutId"]?.GetValue<string>();
+        if (layoutId is not null && !System.Text.RegularExpressions.Regex.IsMatch(layoutId, "^[0-9A-Fa-f]{8}$"))
+            throw new InvalidDataException("Invalid layout ID in package.");
         return new LayoutPackage
         {
             Name = manifest["name"]!.GetValue<string>(),
@@ -112,7 +131,7 @@ public sealed class LayoutPackage
             Locale = manifest["locale"]!.GetValue<string>(),
             LanguageId = (ushort)manifest["languageId"]!.GetValue<int>(),
             Version = manifest["layoutVersion"]?.GetValue<string>() ?? "1.0",
-            LayoutId = manifest["layoutId"]?.GetValue<string>(),
+            LayoutId = layoutId,
             DllX64 = entries["x64/" + dll],
             DllWow64 = entries.GetValueOrDefault("wow64/" + dll),
             DllArm64 = entries.GetValueOrDefault("arm64/" + dll),

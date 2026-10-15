@@ -57,6 +57,7 @@ public sealed class EditorViewModel : ObservableObject
     private readonly LayoutHistory _history;
     private TypingSimulator? _simulator;
     private KeyboardLayout? _effective;
+    private ComposeCompilation? _compilation;
     private readonly HashSet<(int, bool)> _heldLayerKeys = [];
     private KeyboardLayout _layout;
     private string? _filePath;
@@ -91,7 +92,7 @@ public sealed class EditorViewModel : ObservableObject
         Tests = new TestsViewModel(this);
         Compare = new CompareViewModel(this);
 
-        NewCommand = new RelayCommand(p => New(p as string ?? "en-US"));
+        NewCommand = new AsyncRelayCommand(async p => { if (await ConfirmDiscardAsync()) New(p as string ?? "en-US"); }, onError: ReportError);
         OpenCommand = new AsyncRelayCommand(OpenAsync, onError: ReportError);
         SaveCommand = new AsyncRelayCommand(() => SaveAsync(saveAs: false), onError: ReportError);
         SaveAsCommand = new AsyncRelayCommand(() => SaveAsync(saveAs: true), onError: ReportError);
@@ -195,12 +196,14 @@ public sealed class EditorViewModel : ObservableObject
     public double TestMinutesValue { get => _testMinutes; set { TestMinutes = double.IsNaN(value) ? 30 : (int)Math.Round(value); OnPropertyChanged(); } }
 
     // Metadata (bound to the "Layout" tab)
-    public string LayoutName { get => _layout.Metadata.Name; set { _layout.Metadata.Name = value; MarkChanged("name"); OnPropertyChanged(nameof(Title)); } }
-    public string DllName { get => _layout.Metadata.DllName; set { _layout.Metadata.DllName = value; MarkChanged("dll"); } }
-    public string Locale { get => _layout.Metadata.Locale; set { _layout.Metadata.Locale = value; MarkChanged("locale"); } }
-    public string LayoutVersion { get => _layout.Metadata.Version; set { _layout.Metadata.Version = value; MarkChanged("version"); } }
-    public string? Author { get => _layout.Metadata.Author; set { _layout.Metadata.Author = value; MarkChanged("author"); } }
-    public string? Description { get => _layout.Metadata.Description; set { _layout.Metadata.Description = value; MarkChanged("description"); } }
+    public string LayoutName { get => _layout.Metadata.Name; set { if (_layout.Metadata.Name == value) return; _layout.Metadata.Name = value; MarkChanged("name"); OnPropertyChanged(nameof(Title)); } }
+    public string DllName { get => _layout.Metadata.DllName; set { if (_layout.Metadata.DllName == value) return; _layout.Metadata.DllName = value; MarkChanged("dll"); } }
+    public string Locale { get => _layout.Metadata.Locale; set { if (_layout.Metadata.Locale == value) return; _layout.Metadata.Locale = value; MarkChanged("locale"); } }
+    public string LayoutVersion { get => _layout.Metadata.Version; set { if (_layout.Metadata.Version == value) return; _layout.Metadata.Version = value; MarkChanged("version"); } }
+    public string? Author { get => _layout.Metadata.Author; set { value = NullIfEmpty(value); if (_layout.Metadata.Author == value) return; _layout.Metadata.Author = value; MarkChanged("author"); } }
+    public string? Description { get => _layout.Metadata.Description; set { value = NullIfEmpty(value); if (_layout.Metadata.Description == value) return; _layout.Metadata.Description = value; MarkChanged("description"); } }
+
+    private static string? NullIfEmpty(string? s) => string.IsNullOrEmpty(s) ? null : s;
     public string? LayoutId => _layout.Metadata.LayoutId;
 
     public IReadOnlyList<ShortcutModeOption> ShortcutModes { get; } = [.. Enum.GetValues<ShortcutMode>().Select(m => new ShortcutModeOption(m))];
@@ -297,12 +300,34 @@ public sealed class EditorViewModel : ObservableObject
         Status = report.IsLossless ? $"Opened {Path.GetFileName(path)}." : $"Opened {Path.GetFileName(path)} with {report.Warnings.Count} warning(s): {string.Join(" ", report.Warnings)}";
     }
 
+    /// <summary>Opens a file after asking about unsaved changes; reports errors instead of throwing. Returns true if opened.</summary>
+    public async Task<bool> OpenFileInteractiveAsync(string path)
+    {
+        if (!await ConfirmDiscardAsync()) return false;
+        try
+        {
+            OpenFile(path);
+            return true;
+        }
+        catch (Exception ex) when (ex is LayoutFormatException or IOException or UnauthorizedAccessException or NotSupportedException
+                                       or InvalidDataException or Keyservant.Binary.Pe.InvalidLayoutDllException)
+        {
+            ReportError(ex);
+            return false;
+        }
+    }
+
+    /// <summary>Asks whether unsaved changes may be discarded (also used when the window closes).</summary>
+    public async Task<bool> ConfirmDiscardAsync() =>
+        !_isDirty || await _dialogs.ConfirmAsync("Discard changes?", "The current layout has unsaved changes.", "Discard");
+
     private void Load(KeyboardLayout layout, string? path, bool resetHistory)
     {
         _layout = layout;
         _filePath = path;
         _simulator = null;
         _effective = null;
+        _compilation = null;
         _heldLayerKeys.Clear();
         PreviewText = "";
         if (resetHistory) _history.Reset(layout);
@@ -328,11 +353,13 @@ public sealed class EditorViewModel : ObservableObject
     internal void ReloadShiftStates()
     {
         var previous = _selectedState.State;
+        var ligatureState = Ligatures.NewState?.State;
         ShiftStates.Clear();
         foreach (var s in StandardStates.Concat(_layout.Modifiers.Columns).Distinct())
             ShiftStates.Add(new ShiftStateOption(s));
         _selectedState = ShiftStates.FirstOrDefault(s => s.State == previous) ?? ShiftStates[0];
         OnPropertyChanged(nameof(SelectedState));
+        Ligatures.NewState = ShiftStates.FirstOrDefault(s => s.State == ligatureState);
         BuildKeyboard();
     }
 
@@ -359,6 +386,13 @@ public sealed class EditorViewModel : ObservableObject
             SelectKey(again);
     }
 
+    /// <summary>After an edit on another tab changed the selected key (scan code, ligature): refresh it and its editor.</summary>
+    internal void RefreshSelectedKey()
+    {
+        RefreshKeyboard();
+        if (_selectedKey is { } cap) SelectKey(cap);
+    }
+
     /// <summary>Updates every key cap from the layout.</summary>
     internal void RefreshKeyboard()
     {
@@ -383,8 +417,13 @@ public sealed class EditorViewModel : ObservableObject
 
     internal void SetOutput(byte vk, ShiftState state, KeyOutput? output)
     {
+        var columns = _layout.Modifiers.ColumnCount;
+        var altGr = AltGrFlag;
         _layout.SetOutput(vk, state, output);
         if (output is { IsDead: true }) DeadKeys.Load(_layout);
+        // Typing into a state the layout didn't have adds a column (and may switch on AltGr).
+        if (columns != _layout.Modifiers.ColumnCount) ShiftStateEditor.Load();
+        if (altGr != AltGrFlag) OnPropertyChanged(nameof(AltGrFlag));
         MarkChanged($"output:{vk}:{state.Value}");
         RefreshKeyboard();
         Ligatures.Load();
@@ -400,9 +439,11 @@ public sealed class EditorViewModel : ObservableObject
         IsDirty = true;
         _simulator = null;
         _effective = null;
+        _compilation = null;
         _history.Record(_layout, group);
         Validate();
         Tests.UpdateResults();
+        Compare.LayoutEdited();
     }
 
     /// <summary>After a tool changed many parts of the layout at once (assistant, import): record and refresh all tabs.</summary>
@@ -429,6 +470,8 @@ public sealed class EditorViewModel : ObservableObject
     private void ApplyHistory(KeyboardLayout layout, string status)
     {
         var path = _filePath;
+        // The layout ID is assigned by installing, not an edit: keep it, or the next install would add a duplicate.
+        layout.Metadata.LayoutId ??= _layout.Metadata.LayoutId;
         Load(layout, path, resetHistory: false);
         IsDirty = true;
         Status = status;
@@ -437,12 +480,15 @@ public sealed class EditorViewModel : ObservableObject
     private void Validate()
     {
         Issues.Clear();
-        foreach (var i in LayoutValidator.Validate(_layout).Issues.OrderByDescending(i => i.Severity)) Issues.Add(i);
+        foreach (var i in LayoutValidator.Validate(_layout, Compilation).Issues.OrderByDescending(i => i.Severity)) Issues.Add(i);
         OnPropertyChanged(nameof(IssueSummary));
     }
 
     /// <summary>The layout as it will be built: compose sequences compiled into dead keys.</summary>
-    internal KeyboardLayout EffectiveLayout() => ComposeCompiler.Compile(_layout).Layout;
+    internal KeyboardLayout EffectiveLayout() => Compilation.Layout;
+
+    /// <summary>The compose compilation of the current layout, computed once per change.</summary>
+    internal ComposeCompilation Compilation => _compilation ??= ComposeCompiler.Compile(_layout);
 
     // ---------------------------------------------------------------- live preview
 
@@ -467,6 +513,7 @@ public sealed class EditorViewModel : ObservableObject
         }
         var bits = ModifierBits.None;
         if (shift) bits |= ModifierBits.Shift;
+        if (ctrl && !alt) return false; // Ctrl shortcuts (Ctrl+Z, Ctrl+Y...) stay shortcuts in the preview
         if (ctrl) bits |= ModifierBits.Ctrl;
         if (alt) bits |= ModifierBits.Alt;
         bits |= LayerKeys.HeldLayers(_effective, _heldLayerKeys);
@@ -479,6 +526,13 @@ public sealed class EditorViewModel : ObservableObject
         else if (text.Any(char.IsControl) && text != "\t") return true;
         PreviewText += text;
         return true;
+    }
+
+    /// <summary>The preview lost focus: no key is held any more (key-up events go elsewhere now).</summary>
+    public void ResetPreviewKeys()
+    {
+        _heldLayerKeys.Clear();
+        _simulator?.Reset();
     }
 
     /// <summary>Releases a layer key in the preview. Returns true if it was one.</summary>
@@ -495,8 +549,6 @@ public sealed class EditorViewModel : ObservableObject
         if (path is not null) OpenFile(path);
     }
 
-    private async Task<bool> ConfirmDiscardAsync() =>
-        !_isDirty || await _dialogs.ConfirmAsync("Discard changes?", "The current layout has unsaved changes.", "Discard");
 
     /// <summary>Saves to the current file, or asks for one. Returns false if cancelled.</summary>
     public async Task<bool> SaveAsync(bool saveAs)
@@ -511,6 +563,7 @@ public sealed class EditorViewModel : ObservableObject
         _filePath = path;
         IsDirty = false;
         OnPropertyChanged(nameof(Title));
+        Compare.CompareWithSavedCommand.NotifyCanExecuteChanged();
         Status = $"Saved {Path.GetFileName(path)}.";
         return true;
     }
@@ -562,16 +615,16 @@ public sealed class EditorViewModel : ObservableObject
 
     private async Task InstallAsync()
     {
-        if (!await PrepareInstallAsync()) return;
-        var result = await _privileged.InstallAsync(_filePath!);
-        await FinishInstallAsync(result);
+        if (!await PrepareInstallAsync() || _filePath is not { } file) return;
+        var result = await _privileged.InstallAsync(file);
+        await FinishInstallAsync(result, file);
     }
 
     private async Task TestInstallAsync()
     {
-        if (!await PrepareInstallAsync()) return;
-        var result = await _privileged.InstallTemporaryAsync(_filePath!, _testMinutes);
-        await FinishInstallAsync(result);
+        if (!await PrepareInstallAsync() || _filePath is not { } file) return;
+        var result = await _privileged.InstallTemporaryAsync(file, _testMinutes);
+        await FinishInstallAsync(result, file);
     }
 
     private async Task<bool> PrepareInstallAsync()
@@ -582,15 +635,17 @@ public sealed class EditorViewModel : ObservableObject
         return true;
     }
 
-    private async Task FinishInstallAsync(OperationResult result)
+    private async Task FinishInstallAsync(OperationResult result, string file)
     {
         if (result.Cancelled) { Status = "Cancelled."; return; }
         if (!result.Succeeded) { await _dialogs.ShowMessageAsync("Installation failed", result.Output); Status = "Installation failed."; return; }
-        // The installer stores the assigned layout ID in the file; reload it so the next install updates in place.
-        var saved = KeyservantFormat.Parse(await File.ReadAllTextAsync(_filePath!));
+        Status = result.Output.Trim();
+        // The installer stores the assigned layout ID in the file; take it over so the next install updates in place
+        // (unless another file was opened in the meantime).
+        var saved = KeyservantFormat.Parse(await File.ReadAllTextAsync(file));
+        if (!string.Equals(_filePath, file, StringComparison.OrdinalIgnoreCase)) return;
         _layout.Metadata.LayoutId = saved.Metadata.LayoutId;
         OnPropertyChanged(nameof(LayoutId));
-        Status = result.Output.Trim();
     }
 
     private async Task PackageAsync()
