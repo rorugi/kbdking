@@ -82,12 +82,14 @@ public partial class PresentationTests
         Assert.Equal('¨', editor.DeadKeys.Selected?.AccentChar);
     }
 
-    [Fact]
-    public void The_whole_sanskrit_preset_becomes_typeable()
+    [Theory]
+    [InlineData("Sanskrit (IAST)")]
+    [InlineData("Sanskrit (ISO 15919)")]
+    public void The_sanskrit_presets_become_typeable(string name)
     {
-        var preset = NewEditor().Assistant.Presets.First(p => p.Name.StartsWith("Sanskrit", StringComparison.Ordinal)).Characters;
-        Assert.Contains("r̥", preset, StringComparison.Ordinal);
-        Assert.Contains("l̥̄", preset, StringComparison.Ordinal);
+        var preset = NewEditor().Assistant.Presets.First(p => p.Name == name).Characters;
+        // IAST writes vocalic r and l with dot below (ṛ ḷ); only ISO 15919 uses the ring below (r̥ l̥).
+        Assert.Equal(name.Contains("ISO", StringComparison.Ordinal), preset.Contains('\u0325', StringComparison.Ordinal));
         var layout = LayoutTemplates.Create("de-AT");
         var plan = PlacementPlanner.Plan(layout, preset);
         Assert.Empty(plan.NotPlaced);

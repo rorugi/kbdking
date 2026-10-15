@@ -57,7 +57,9 @@ public sealed class AssistantViewModel : ObservableObject
     /// <summary>Character sets to start from.</summary>
     public IReadOnlyList<CharacterPreset> Presets { get; } =
     [
-        new("Sanskrit (IAST)", "āĀīĪūŪṛṚṝṜḷḶḹḸr̥R̥r̥̄R̥̄l̥L̥l̥̄L̥̄ṅṄñÑṭṬḍḌṇṆśŚṣṢṃṂḥḤ√"),
+        new("Sanskrit (IAST)", "āĀīĪūŪṛṚṝṜḷḶḹḸṅṄñÑṭṬḍḌṇṆśŚṣṢṃṂḥḤ√"),
+        // ISO 15919 writes vocalic r and l with ring below (no single characters exist: typed as letter + combining mark).
+        new("Sanskrit (ISO 15919)", "āĀīĪūŪr̥R̥r̥̄R̥̄l̥L̥l̥̄L̥̄ṅṄñÑṭṬḍḌṇṆśŚṣṢṁṀḥḤm̐"),
         new("Pali", "āĀīĪūŪṅṄñÑṭṬḍḌṇṆḷḶṃṂ"),
         new("Hindi transliteration (ISO 15919)", "āĀīĪūŪr̥R̥r̥̄R̥̄l̥L̥l̥̄L̥̄ēĒōŌṅṄñÑṭṬḍḌṇṆśŚṣṢṁṀḥḤ"),
         new("Pinyin with tones", "āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüĀÁǍÀĒÉĚÈĪÍǏÌŌÓǑÒŪÚǓÙǕǗǙǛÜ"),

@@ -98,6 +98,7 @@ public static class PlacementPlanner
         ['̭'] = new("circumflex below", null, "^"),
         ['̱'] = new("macron below", null, "_-"),
         ['̛'] = new("horn", null, "+"),
+        ['̐'] = new("candrabindu", null, "^"),
     };
 
     private static readonly ShiftState[] SymbolSlots = [ShiftState.AltGr, ShiftState.ShiftAltGr];
