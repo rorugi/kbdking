@@ -29,19 +29,19 @@ jobs:
           "version=$v" >> $env:GITHUB_OUTPUT
 
       - name: Test
-        run: dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release
+        run: dotnet test tests/Kbdking.Tests/Kbdking.Tests.csproj -c Release
 
       - name: Publish
         shell: pwsh
         run: |
           $v = "${{ steps.version.outputs.version }}"
-          dotnet publish src/Keyservant.App/Keyservant.App.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained -p:Version=$v -o dist/Keyservant
-          dotnet publish src/Keyservant.Cli/Keyservant.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:Version=$v -o dist/Keyservant
-          dotnet publish src/Keyservant.Stub/Keyservant.Stub.csproj -c Release -r win-x64 -p:Version=$v -o dist/Keyservant
+          dotnet publish src/Kbdking.App/Kbdking.App.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained -p:Version=$v -o dist/kbdking
+          dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:Version=$v -o dist/kbdking
+          dotnet publish src/Kbdking.Stub/Kbdking.Stub.csproj -c Release -r win-x64 -p:Version=$v -o dist/kbdking
           # ARM64: native app and CLI. The installer stub stays x64 (it runs emulated and installs the ARM64 DLL).
-          dotnet publish src/Keyservant.App/Keyservant.App.csproj -c Release -p:Platform=ARM64 -r win-arm64 --self-contained -p:Version=$v -o dist/Keyservant-arm64
-          dotnet publish src/Keyservant.Cli/Keyservant.Cli.csproj -c Release -r win-arm64 --self-contained -p:PublishSingleFile=true -p:Version=$v -o dist/Keyservant-arm64
-          Copy-Item dist/Keyservant/Keyservant.Stub.exe dist/Keyservant-arm64/
+          dotnet publish src/Kbdking.App/Kbdking.App.csproj -c Release -p:Platform=ARM64 -r win-arm64 --self-contained -p:Version=$v -o dist/kbdking-arm64
+          dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-arm64 --self-contained -p:PublishSingleFile=true -p:Version=$v -o dist/kbdking-arm64
+          Copy-Item dist/kbdking/Kbdking.Stub.exe dist/kbdking-arm64/
 
       # Code signing through SignPath Foundation (free for open source). Runs once the project is approved
       # and the repository variables/secrets below are set. See CODE_SIGNING_POLICY.md.
@@ -59,7 +59,7 @@ jobs:
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: keyservant
+          project-slug: kbdking
           signing-policy-slug: release-signing
           github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
           wait-for-completion: true
@@ -74,10 +74,10 @@ jobs:
       - name: Zip
         shell: pwsh
         run: |
-          Compress-Archive -Path dist/Keyservant/* -DestinationPath "Keyservant-${{ steps.version.outputs.version }}-win-x64.zip"
-          Compress-Archive -Path dist/Keyservant-arm64/* -DestinationPath "Keyservant-${{ steps.version.outputs.version }}-win-arm64.zip"
+          Compress-Archive -Path dist/kbdking/* -DestinationPath "kbdking-${{ steps.version.outputs.version }}-win-x64.zip"
+          Compress-Archive -Path dist/kbdking-arm64/* -DestinationPath "kbdking-${{ steps.version.outputs.version }}-win-arm64.zip"
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" "Keyservant-${{ steps.version.outputs.version }}-win-x64.zip" "Keyservant-${{ steps.version.outputs.version }}-win-arm64.zip" artifacts/Keyservant-x64.msi artifacts/Keyservant-arm64.msi --title "Keyservant ${{ steps.version.outputs.version }}" --generate-notes
+        run: gh release create "${{ github.ref_name }}" "kbdking-${{ steps.version.outputs.version }}-win-x64.zip" "kbdking-${{ steps.version.outputs.version }}-win-arm64.zip" artifacts/kbdking-x64.msi artifacts/kbdking-arm64.msi --title "kbdking ${{ steps.version.outputs.version }}" --generate-notes

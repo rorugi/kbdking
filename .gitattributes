@@ -7,7 +7,7 @@
 *.ps1     text eol=crlf
 
 # Layout files are UTF-8 JSON and diff well.
-*.keyservant text
+*.kbdking text
 
 # MSKLC sources are UTF-16; let Git treat them as binary unless configured otherwise.
 *.klc -text diff

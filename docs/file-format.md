@@ -1,7 +1,7 @@
-# The .keyservant file format
+# The .kbdking file format
 
-A `.keyservant` file is UTF-8 JSON describing one Windows keyboard layout completely: everything a layout
-DLL can contain, plus descriptive metadata. It is the format Keyservant saves, and the one to keep in Git.
+A `.kbdking` file is UTF-8 JSON describing one Windows keyboard layout completely: everything a layout
+DLL can contain, plus descriptive metadata. It is the format kbdking saves, and the one to keep in Git.
 
 Design goals:
 
@@ -10,13 +10,13 @@ Design goals:
 - **Visible characters**: control characters, combining marks, format and private-use characters are
   written as `\uXXXX` escapes; all other characters are written literally.
 
-Comments (`//`, `/* */`) and trailing commas are accepted when reading; Keyservant does not write them.
+Comments (`//`, `/* */`) and trailing commas are accepted when reading; kbdking does not write them.
 
 ## Top level
 
 ```json
 {
-  "format": "keyservant-layout",
+  "format": "kbdking-layout",
   "schemaVersion": 1,
   "metadata": { ... },
   "flags": ["altgr"],
@@ -34,7 +34,7 @@ Comments (`//`, `/* */`) and trailing commas are accepted when reading; Keyserva
 
 | Property | Meaning |
 | --- | --- |
-| `format` | Always `keyservant-layout`. |
+| `format` | Always `kbdking-layout`. |
 | `schemaVersion` | `1`. Readers refuse newer versions they don't know. |
 | `flags` | Any of `altgr` (Right Alt acts as AltGr), `shiftlock` (Shift releases Caps Lock), `lrm-rlm` (Shift+Backspace types LRM/RLM). |
 | `kbdVersion` | kbd.h `KBD_VERSION`. `1` is required for ligatures. |
@@ -59,7 +59,7 @@ Comments (`//`, `/* */`) and trailing commas are accepted when reading; Keyserva
 
 - `dllName`: the DLL file name without `.dll`, 1–8 letters, digits or underscores.
 - `locale`: BCP 47 tag of the input language the layout is offered under.
-- `layoutId`: the KLID assigned on first install. Keyservant writes it back into the file, so the next
+- `layoutId`: the KLID assigned on first install. kbdking writes it back into the file, so the next
   install updates the same layout. Leave it out for new layouts.
 
 ## modifiers
@@ -96,14 +96,14 @@ layer states:
 "keys": [{"vk": "A", "base": "a", "shift": "A", "layer-a": "α", "shift+layer-a": "Α"}]
 ```
 
-`keyservant layers <file> add 3A A` (or the app's Shift states tab) writes all of this. In tests, layers
+`kbdking layers <file> add 3A A` (or the app's Shift states tab) writes all of this. In tests, layers
 are written `LayerA+a`.
 
 ### Shortcut positions
 
 Apps recognise shortcuts such as Ctrl+C by virtual key. Which physical key sends `VK_C` is decided by
 `scanCodes`, independently of what the key types. Normally letter keys send the virtual key of their letter
-(shortcuts follow the letters). `keyservant shortcuts <file> qwerty` (or the Layout tab) instead gives the
+(shortcuts follow the letters). `kbdking shortcuts <file> qwerty` (or the Layout tab) instead gives the
 letter positions of a US keyboard their US virtual keys, moving each key's characters along, so Ctrl+C/V/X/Z
 stay under the same fingers on Colemak, Dvorak, Neo and the like. `qwertz`, `azerty` and `letters` work the
 same way. Nothing is stored besides the resulting `scanCodes` and `keys`.
@@ -175,7 +175,7 @@ codes:
 
 ## compose (optional)
 
-A compose key and the sequences typed after it. Keyservant compiles them into chained dead keys when the
+A compose key and the sequences typed after it. kbdking compiles them into chained dead keys when the
 layout is built, so they work in every app without extra software.
 
 ```json
@@ -192,7 +192,7 @@ layout is built, so they work in every app without extra software.
 
 - `key`: the scan code of the compose key, `E0 5D` (the Menu key) by default; `E0 5C` is the right Windows
   key, `6E` the Copilot key (it sends Win + Shift + F23; as the compose key it no longer opens Copilot),
-  `3A` Caps Lock. Right Alt (`E0 38`) only works if the layout has no AltGr characters. Keyservant gives that key a free virtual key that types a dead key.
+  `3A` Caps Lock. Right Alt (`E0 38`) only works if the layout has no AltGr characters. kbdking gives that key a free virtual key that types a dead key.
 - `accent`: what Windows shows while it waits for the rest of the sequence (default ⎄ U+2384).
 - `sequences`: `[keys, result]`. `keys` are the characters typed after the compose key, as they are typed
   with this layout (so `"A"` means Shift+a). `result` must be a single BMP character. Intermediate steps
@@ -200,11 +200,11 @@ layout is built, so they work in every app without extra software.
 - A sequence that is a prefix of another one wins; the longer one is reported and dropped. Keys the layout
   can't type are reported too.
 
-`keyservant compose import` reads `.XCompose` files (Linux, WinCompose) and keeps the `<Multi_key>` lines.
+`kbdking compose import` reads `.XCompose` files (Linux, WinCompose) and keeps the `<Multi_key>` lines.
 
 ## tests (optional)
 
-Checks that run with `keyservant test`, in the app after every change, and as part of validation (a
+Checks that run with `kbdking test`, in the app after every change, and as part of validation (a
 failing test is an error, so the layout won't build):
 
 ```json

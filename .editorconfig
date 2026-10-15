@@ -8,7 +8,7 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
 
-[*.{json,yml,yaml,keyservant,csproj,props,slnx,xaml,manifest}]
+[*.{json,yml,yaml,kbdking,csproj,props,slnx,xaml,manifest}]
 indent_size = 2
 
 [*.xaml]

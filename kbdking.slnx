@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Kbdking.App/Kbdking.App.csproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/Kbdking.Binary/Kbdking.Binary.csproj" />
+    <Project Path="src/Kbdking.Cli/Kbdking.Cli.csproj" />
+    <Project Path="src/Kbdking.Core/Kbdking.Core.csproj" />
+    <Project Path="src/Kbdking.Platform/Kbdking.Platform.csproj" />
+    <Project Path="src/Kbdking.Presentation/Kbdking.Presentation.csproj" />
+    <Project Path="src/Kbdking.Stub/Kbdking.Stub.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Kbdking.Tests/Kbdking.Tests.csproj" />
+  </Folder>
+</Solution>

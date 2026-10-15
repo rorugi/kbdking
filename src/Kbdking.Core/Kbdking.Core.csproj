@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Kbdking.Core</RootNamespace>
+    <Description>Keyboard layout model, the .kbdking file format, importers/exporters and validation. No UI and no Windows dependencies.</Description>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kbdking.Tests" />
+    <EmbeddedResource Include="Unicode\UnicodeNames.txt.gz" LogicalName="Kbdking.Core.Unicode.UnicodeNames.txt.gz" />
+  </ItemGroup>
+
+</Project>

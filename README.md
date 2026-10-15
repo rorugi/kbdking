@@ -1,8 +1,11 @@
-# Keyservant
+# kbdking
 
-Keyservant creates, edits and installs Windows keyboard layouts. It imports an existing layout, lets you
+kbdking creates, edits and installs Windows keyboard layouts. It imports an existing layout, lets you
 change any key, dead key or ligature, and builds a real Windows layout DLL, so the result works in every
 app with nothing running in the background. Free and open source (MIT).
+
+Formerly called *Keyservant*. Installing kbdking replaces an installed Keyservant, layouts installed with it are
+kept and managed as before, and old `.keyservant` files open once renamed to `.kbdking`.
 
 > **Status: v0.1, early development.** The engine, file formats, DLL writer and CLI are implemented and
 > tested; the Windows app and the installer are first versions that still need testing on real PCs.
@@ -10,13 +13,13 @@ app with nothing running in the background. Free and open source (MIT).
 
 ## Install
 
-Download the newest installer from [**Releases → latest**](https://github.com/rorugi/keyservant/releases/tag/latest):
-`Keyservant-x64.msi` (or `Keyservant-arm64.msi` for Windows on ARM) and run it. It installs Keyservant for all users,
-adds it to the Start menu and puts the `keyservant` command on the PATH; uninstall it in Settings → Apps. Every
+Download the newest installer from [**Releases → latest**](https://github.com/rorugi/kbdking/releases/tag/latest):
+`kbdking-x64.msi` (or `kbdking-arm64.msi` for Windows on ARM) and run it. It installs kbdking for all users,
+adds it to the Start menu and puts the `kbdking` command on the PATH; uninstall it in Settings → Apps. Every
 change on `main` builds a new one. The installer isn't signed yet, so Windows may say it doesn't know the publisher:
 choose *More info → Run anyway*.
 
-To build the installer yourself: `.\tools\build-installer.ps1` (writes `artifacts\Keyservant-x64.msi`).
+To build the installer yourself: `.\tools\build-installer.ps1` (writes `artifacts\kbdking-x64.msi`).
 
 ## Features
 
@@ -44,11 +47,11 @@ To build the installer yourself: `.\tools\build-installer.ps1` (writes `artifact
 - **Layout tests**: “AltGr+. t must type ṭ”, saved in the file and checked after every change.
 - **Compare**: the differences between two layouts, listed and marked on the keyboard.
 - **Test installs**: install a layout for a set time; Windows removes it again automatically, even if
-  Keyservant is closed, unless you choose *Keep*.
+  kbdking is closed, unless you choose *Keep*.
 - **Printouts**: keyboard pictures and key stickers (SVG, real size).
-- **Formats**: `.keyservant` (readable JSON, diff-friendly), MSKLC `.klc`, Windows layout DLLs, macOS
+- **Formats**: `.kbdking` (readable JSON, diff-friendly), MSKLC `.klc`, Windows layout DLLs, macOS
   `.keylayout`, Linux XKB symbols (plus a `.XCompose` file for dead keys), and C source.
-- **Builds without a compiler**: Keyservant writes the PE file itself, for x64, ARM64 and the 32-bit WOW64
+- **Builds without a compiler**: kbdking writes the PE file itself, for x64, ARM64 and the 32-bit WOW64
   DLL that 32-bit apps use. No Visual Studio, WDK or MSKLC needed, and builds are reproducible.
 - **Deployment**: a small standalone `setup.exe` for any Windows PC (with an entry in *Apps & features*),
   an MSI for Group Policy and Intune, and a ready-to-wrap Intune Win32 app folder with a detection script.
@@ -56,42 +59,42 @@ To build the installer yourself: `.\tools\build-installer.ps1` (writes `artifact
 ## Quick start (CLI)
 
 ```powershell
-keyservant new de-AT -o my-layout.keyservant --name "German + IAST" --dll kbdiast
-# edit my-layout.keyservant, or open it in the Keyservant app
-keyservant validate my-layout.keyservant
-keyservant install my-layout.keyservant        # asks for admin rights once
-keyservant list --custom
-keyservant uninstall A0000C07
+kbdking new de-AT -o my-layout.kbdking --name "German + IAST" --dll kbdiast
+# edit my-layout.kbdking, or open it in the kbdking app
+kbdking validate my-layout.kbdking
+kbdking install my-layout.kbdking        # asks for admin rights once
+kbdking list --custom
+kbdking uninstall A0000C07
 ```
 
 More commands:
 
 ```powershell
-keyservant install my-layout.keyservant --temporary 30   # test install, reverts itself after 30 minutes
-keyservant keep A0000C07                                 # ...or keep it
-keyservant suggest my-layout.keyservant --chars "āīūṛṝḷṅñṭḍṇśṣṃḥ" --apply
-keyservant compose import my-layout.keyservant ~/.XCompose
-keyservant test my-layout.keyservant
-keyservant analyze my-layout.keyservant mytext.txt --heatmap heat.svg --compare other.keyservant
-keyservant diff old.keyservant my-layout.keyservant --svg changes.svg
-keyservant render my-layout.keyservant -o stickers.svg --stickers
-keyservant convert my-layout.keyservant my-layout.keylayout      # macOS; .xkb for Linux
-keyservant package my-layout.keyservant --msi my-layout.msi       # needs WiX: dotnet tool install -g wix
-keyservant package my-layout.keyservant --intune intune-folder
-keyservant unicode a macron
-keyservant shortcuts colemak.keyservant qwerty                    # Ctrl+C/V/Z stay at QWERTY positions
-keyservant layers my-layout.keyservant add 3A A                  # Caps Lock selects Layer A while held
+kbdking install my-layout.kbdking --temporary 30   # test install, reverts itself after 30 minutes
+kbdking keep A0000C07                                 # ...or keep it
+kbdking suggest my-layout.kbdking --chars "āīūṛṝḷṅñṭḍṇśṣṃḥ" --apply
+kbdking compose import my-layout.kbdking ~/.XCompose
+kbdking test my-layout.kbdking
+kbdking analyze my-layout.kbdking mytext.txt --heatmap heat.svg --compare other.kbdking
+kbdking diff old.kbdking my-layout.kbdking --svg changes.svg
+kbdking render my-layout.kbdking -o stickers.svg --stickers
+kbdking convert my-layout.kbdking my-layout.keylayout      # macOS; .xkb for Linux
+kbdking package my-layout.kbdking --msi my-layout.msi       # needs WiX: dotnet tool install -g wix
+kbdking package my-layout.kbdking --intune intune-folder
+kbdking unicode a macron
+kbdking shortcuts colemak.kbdking qwerty                    # Ctrl+C/V/Z stay at QWERTY positions
+kbdking layers my-layout.kbdking add 3A A                  # Caps Lock selects Layer A while held
 ```
 
 Also: `templates`, `build` (DLLs only), `enable`/`disable` (switcher), `import` (save an installed layout
-as a `.keyservant` file) and `repair`. Run `keyservant help` for details.
+as a `.kbdking` file) and `repair`. Run `kbdking help` for details.
 
-The sample [`samples/german-austria-iast.keyservant`](samples/german-austria-iast.keyservant) adds IAST
+The sample [`samples/german-austria-iast.kbdking`](samples/german-austria-iast.kbdking) adds IAST
 transliteration for Sanskrit to the Austrian German layout: AltGr+a/i/u → ā ī ū, AltGr+s → ś,
 AltGr+g → ṅ, AltGr+n → ñ, AltGr+r → √ (root sign, as in √gam), a dot-below dead key on AltGr+. (ṭ ḍ ṇ ṣ ṛ ḷ ṃ ḥ) and a macron dead key on
 AltGr+- that chain into ṝ and ḹ.
 
-## The .keyservant format
+## The .kbdking format
 
 UTF-8 JSON with one key per line:
 
@@ -109,26 +112,26 @@ Requirements: .NET 10 SDK. The engine, CLI and tests build on Windows, Linux and
 installer stub need Windows.
 
 ```bash
-dotnet test tests/Keyservant.Tests          # all platforms
-dotnet run --project src/Keyservant.Cli -- help
-dotnet build src/Keyservant.App -p:Platform=x64   # Windows only
+dotnet test tests/Kbdking.Tests          # all platforms
+dotnet run --project src/Kbdking.Cli -- help
+dotnet build src/Kbdking.App -p:Platform=x64   # Windows only
 ```
 
 If `clang-cl` and `lld-link` are on the `PATH`, the tests also compile every test layout as C with clang
-and check that Keyservant's own DLL writer produces the same tables.
+and check that kbdking's own DLL writer produces the same tables.
 
 ## Project structure
 
 | Project | Purpose |
 | --- | --- |
-| `Keyservant.Core` | Layout model, formats (`.keyservant`, `.klc`, `.keylayout`, XKB), validator, templates, typing simulator, compose compiler, assistant, analysis, diff, SVG rendering, Unicode names |
-| `Keyservant.Binary` | PE writer and reader for layout DLLs (x64, WOW64, ARM64), C source export, layout packages, MSI and Intune packaging |
-| `Keyservant.Platform` | Windows integration: registry, switcher, install, uninstall, repair |
-| `Keyservant.Presentation` | View models for the app (UI-framework independent, tested on any OS) |
-| `Keyservant.App` | WinUI 3 app |
-| `Keyservant.Cli` | `keyservant` command-line tool, also the elevated helper used by the app |
-| `Keyservant.Stub` | NativeAOT standalone installer |
-| `Keyservant.Tests` | Unit, round-trip, compiler-oracle and Windows install tests |
+| `Kbdking.Core` | Layout model, formats (`.kbdking`, `.klc`, `.keylayout`, XKB), validator, templates, typing simulator, compose compiler, assistant, analysis, diff, SVG rendering, Unicode names |
+| `Kbdking.Binary` | PE writer and reader for layout DLLs (x64, WOW64, ARM64), C source export, layout packages, MSI and Intune packaging |
+| `Kbdking.Platform` | Windows integration: registry, switcher, install, uninstall, repair |
+| `Kbdking.Presentation` | View models for the app (UI-framework independent, tested on any OS) |
+| `Kbdking.App` | WinUI 3 app |
+| `Kbdking.Cli` | `kbdking` command-line tool, also the elevated helper used by the app |
+| `Kbdking.Stub` | NativeAOT standalone installer |
+| `Kbdking.Tests` | Unit, round-trip, compiler-oracle and Windows install tests |
 
 More in [docs/architecture.md](docs/architecture.md).
 
@@ -136,7 +139,7 @@ More in [docs/architecture.md](docs/architecture.md).
 
 | Area | State |
 | --- | --- |
-| Layout model, `.keyservant`, `.klc` import/export, validator | Implemented, unit-tested |
+| Layout model, `.kbdking`, `.klc` import/export, validator | Implemented, unit-tested |
 | DLL writer and reader (x64, WOW64, ARM64) | Implemented; tables verified against clang-cl/lld-link builds; x64 and WOW64 DLLs load and relocate correctly; ARM64 is installed and typed with on a Windows on ARM runner in CI |
 | Install / uninstall on Windows | Verified in CI: a generated layout is installed, loaded with `LoadKeyboardLayout`, every key, shift state, Caps Lock and dead-key sequence is checked with `ToUnicodeEx`, then it is uninstalled. Compose sequences and test installs (scheduled removal, keep, cleanup) are checked the same way |
 | CLI | Implemented; cross-platform commands tested, Windows commands used by the install test |

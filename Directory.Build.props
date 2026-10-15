@@ -7,11 +7,11 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <Deterministic>true</Deterministic>
 
-    <Product>Keyservant</Product>
-    <Company>Keyservant contributors</Company>
-    <Copyright>Copyright (c) 2026 Keyservant contributors</Copyright>
+    <Product>kbdking</Product>
+    <Company>kbdking contributors</Company>
+    <Copyright>Copyright (c) 2026 kbdking contributors</Copyright>
     <Version>0.1.0</Version>
-    <RepositoryUrl>https://github.com/rorugi/keyservant</RepositoryUrl>
+    <RepositoryUrl>https://github.com/rorugi/kbdking</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 </Project>

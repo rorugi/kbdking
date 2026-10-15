@@ -3,17 +3,17 @@
 All logic lives in UI-free libraries; the app, the CLI and the installer stub are thin front ends.
 
 ```
-Keyservant.App (WinUI 3) ──┐
-Keyservant.Cli ────────────┼──> Keyservant.Presentation (view models, app only)
-Keyservant.Stub ───────────┘            │
+Kbdking.App (WinUI 3) ──┐
+Kbdking.Cli ────────────┼──> Kbdking.Presentation (view models, app only)
+Kbdking.Stub ───────────┘            │
                                          v
-                            Keyservant.Platform (Windows integration)
+                            Kbdking.Platform (Windows integration)
                                          │
                                          v
-                            Keyservant.Binary (PE writer/reader, packages)
+                            Kbdking.Binary (PE writer/reader, packages)
                                          │
                                          v
-                            Keyservant.Core (model, formats, validation)
+                            Kbdking.Core (model, formats, validation)
 ```
 
 ## How Windows loads a layout
@@ -30,7 +30,7 @@ and copies its `.data` section. Two consequences shape the writer:
 The 32-bit DLL in `SysWOW64` uses 64-bit pointers inside its tables (`KBD_LONG_POINTER` = `__ptr64`),
 because the kernel reads them; only its PE headers and code stub are 32-bit.
 
-## The PE writer (`Keyservant.Binary`)
+## The PE writer (`Kbdking.Binary`)
 
 1. `KbdTablesPlan` turns the model into the exact rows of every kbd.h table (one character table for all
    keys plus the numpad table last, dead-key rows after their keys, SGCAPS rows, ligatures, dead keys,
@@ -50,22 +50,22 @@ both DLLs read back identically; this guards the writer against layout mistakes.
 `KbdLayerDescriptor` (x64 `lea rax,[rip+…]`, x86 `mov eax,imm32`, ARM64 `adrp/add`) to find `KBDTABLES`,
 then follows pointers with bounds checks everywhere. A fuzz test feeds it corrupted files.
 
-## Installing (`Keyservant.Platform`)
+## Installing (`Kbdking.Platform`)
 
 - Registry: `HKLM\SYSTEM\CurrentControlSet\Control\Keyboard Layouts\<KLID>` with `Layout File`,
   `Layout Text`, `Layout Display Name` (`@%SystemRoot%\system32\<dll>,-1000`), `Layout Id` and a
-  `Keyservant` marker value.
+  `kbdking` marker value.
 - KLIDs for custom layouts: `Annn<LANGID>`, as MSKLC does.
 - DLLs go to System32 (the ARM64 DLL on Windows on ARM, otherwise x64) and SysWOW64; in-use files are
   replaced or deleted at the next restart.
-- Test installs carry a `KeyservantTemporaryUntil` value and a one-time scheduled task
-  (`\Keyservant\Revert <KLID>`, running as SYSTEM) that runs `keyservant cleanup` when the time is up.
+- Test installs carry a `KbdkingTemporaryUntil` value and a one-time scheduled task
+  (`\kbdking\Revert <KLID>`, running as SYSTEM) that runs `kbdking cleanup` when the time is up.
   `keep` removes both.
 - The switcher is changed with `InstallLayoutOrTip` (input.dll), which needs no admin rights.
-- A copy of each installed package is kept in `%ProgramData%\Keyservant\Layouts\<KLID>` so `repair` can
+- A copy of each installed package is kept in `%ProgramData%\kbdking\Layouts\<KLID>` so `repair` can
   restore layouts that a Windows feature update removed.
 
-The app never runs elevated. Install, uninstall and repair run through `keyservant.exe` with a UAC prompt;
+The app never runs elevated. Install, uninstall and repair run through `kbdking.exe` with a UAC prompt;
 the elevated process writes its output to a temporary log that the app shows.
 
 ## Compose keys

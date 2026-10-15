@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
-    Builds the Keyservant Windows installer (MSI).
+    Builds the kbdking Windows installer (MSI).
 
 .DESCRIPTION
     Publishes the app, the CLI and (if possible) the layout installer stub into one folder and wraps it in an
     MSI with WiX. Installs WiX as a .NET tool if it isn't there yet.
 
     Run from the repository root:
-        .\tools\build-installer.ps1                  # x64, writes artifacts\Keyservant-x64.msi
+        .\tools\build-installer.ps1                  # x64, writes artifacts\kbdking-x64.msi
         .\tools\build-installer.ps1 -Arch arm64      # Windows on ARM
         .\tools\build-installer.ps1 -Version 0.2.0
 
@@ -36,16 +36,16 @@ function Invoke-Checked([string] $what, [scriptblock] $command) {
     if ($LASTEXITCODE -ne 0) { throw "$what failed (exit code $LASTEXITCODE)." }
 }
 
-Invoke-Checked 'Publish app' { dotnet publish src/Keyservant.App/Keyservant.App.csproj -c Release "-p:Platform=$platform" -r $rid --self-contained "-p:Version=$Version" -o $publish }
-Invoke-Checked 'Publish CLI' { dotnet publish src/Keyservant.Cli/Keyservant.Cli.csproj -c Release -r $rid --self-contained -p:PublishSingleFile=true "-p:Version=$Version" -o $publish }
+Invoke-Checked 'Publish app' { dotnet publish src/Kbdking.App/Kbdking.App.csproj -c Release "-p:Platform=$platform" -r $rid --self-contained "-p:Version=$Version" -o $publish }
+Invoke-Checked 'Publish CLI' { dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r $rid --self-contained -p:PublishSingleFile=true "-p:Version=$Version" -o $publish }
 
 # The layout installer stub. NativeAOT for ARM64 needs ARM64 C++ tools, so ARM64 builds use the x64 stub
 # (it runs emulated and installs the right DLL for the PC).
 Write-Host '== Publish installer stub'
 $stubRid = if ($Arch -eq 'arm64') { 'win-x64' } else { $rid }
 $stubOut = Join-Path $Output "stub-$stubRid"
-dotnet publish src/Keyservant.Stub/Keyservant.Stub.csproj -c Release -r $stubRid "-p:Version=$Version" -o $stubOut
-if ($LASTEXITCODE -eq 0) { Copy-Item (Join-Path $stubOut 'Keyservant.Stub.exe') $publish }
+dotnet publish src/Kbdking.Stub/Kbdking.Stub.csproj -c Release -r $stubRid "-p:Version=$Version" -o $stubOut
+if ($LASTEXITCODE -eq 0) { Copy-Item (Join-Path $stubOut 'Kbdking.Stub.exe') $publish }
 else { Write-Warning 'The installer stub could not be built (C++ build tools missing?). "Create installer..." will not be available.' }
 
 # Debug symbols aren't needed on users' PCs.
@@ -62,7 +62,7 @@ foreach ($ext in 'WixToolset.UI.wixext', 'WixToolset.Util.wixext') {
     }
 }
 
-$msi = Join-Path $Output "Keyservant-$Arch.msi"
+$msi = Join-Path $Output "kbdking-$Arch.msi"
 $fullPublish = (Resolve-Path $publish).Path
-Invoke-Checked 'Build MSI' { wix build installer/Keyservant.wxs -arch $Arch -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "PublishDir=$fullPublish" -d "Version=$Version" -o $msi }
+Invoke-Checked 'Build MSI' { wix build installer/kbdking.wxs -arch $Arch -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "PublishDir=$fullPublish" -d "Version=$Version" -o $msi }
 Write-Host "Created $msi"

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Kbdking.Binary</RootNamespace>
+    <Description>Reads and writes Windows keyboard layout DLLs (KBDTABLES) directly as PE files, without a C compiler. Cross-platform.</Description>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kbdking.Core\Kbdking.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kbdking.Tests" />
+  </ItemGroup>
+
+</Project>

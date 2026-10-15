@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Kbdking.Presentation</RootNamespace>
+    <Description>View models for the kbdking app. No UI framework dependency, so they build and test on any OS.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kbdking.Platform\Kbdking.Platform.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kbdking.Tests" />
+  </ItemGroup>
+
+</Project>

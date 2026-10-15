@@ -31,14 +31,14 @@ jobs:
           ls -d /usr/lib/llvm-*/bin | sort -V | tail -1 >> "$GITHUB_PATH"
 
       - name: Test
-        run: dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release --logger "console;verbosity=normal"
+        run: dotnet test tests/Kbdking.Tests/Kbdking.Tests.csproj -c Release --logger "console;verbosity=normal"
 
       - name: Validate and build the samples
         run: |
-          for f in samples/*.keyservant; do
-            name=$(basename "$f" .keyservant)
-            dotnet run --project src/Keyservant.Cli -c Release -- validate "$f"
-            dotnet run --project src/Keyservant.Cli -c Release -- build "$f" -o "out/$name"
+          for f in samples/*.kbdking; do
+            name=$(basename "$f" .kbdking)
+            dotnet run --project src/Kbdking.Cli -c Release -- validate "$f"
+            dotnet run --project src/Kbdking.Cli -c Release -- build "$f" -o "out/$name"
           done
 
       - name: Upload sample DLLs (for manual testing on Windows)
@@ -60,7 +60,7 @@ jobs:
       - name: Test
         shell: pwsh
         run: |
-          dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release --logger "trx;LogFileName=all.trx" --results-directory TestResults
+          dotnet test tests/Kbdking.Tests/Kbdking.Tests.csproj -c Release --logger "trx;LogFileName=all.trx" --results-directory TestResults
           $failedRun = $LASTEXITCODE
           foreach ($r in ([xml](Get-Content TestResults/all.trx)).TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' }) {
             $stack = (("$($r.Output.ErrorInfo.StackTrace)" -split "`n") | Select-Object -First 4) -join "`n"
@@ -72,10 +72,10 @@ jobs:
       # Installs a generated layout on the runner, types with it through ToUnicodeEx and uninstalls it.
       - name: Install-and-type test
         env:
-          KEYSERVANT_INSTALL_TESTS: "1"
+          KBDKING_INSTALL_TESTS: "1"
         shell: pwsh
         run: |
-          dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release --no-build `
+          dotnet test tests/Kbdking.Tests/Kbdking.Tests.csproj -c Release --no-build `
             --filter "FullyQualifiedName~WindowsInstallTests" --logger "trx;LogFileName=install.trx" --results-directory TestResults
           $failedRun = $LASTEXITCODE
           foreach ($r in ([xml](Get-Content TestResults/install.trx)).TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' }) {
@@ -89,21 +89,21 @@ jobs:
           if ($failedRun -ne 0 -or [int]$counters.passed -lt 5) { exit 1 }
 
       - name: Publish CLI
-        run: dotnet publish src/Keyservant.Cli/Keyservant.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o artifacts/cli
+        run: dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o artifacts/cli
 
       - name: Publish installer stub (NativeAOT)
-        run: dotnet publish src/Keyservant.Stub/Keyservant.Stub.csproj -c Release -r win-x64 -o artifacts/stub
+        run: dotnet publish src/Kbdking.Stub/Kbdking.Stub.csproj -c Release -r win-x64 -o artifacts/stub
 
       - name: Create the sample's standalone installer
-        run: artifacts/cli/keyservant.exe package samples/german-austria-iast.keyservant -o artifacts/german-austria-iast-setup.exe --stub artifacts/stub/Keyservant.Stub.exe
+        run: artifacts/cli/kbdking.exe package samples/german-austria-iast.kbdking -o artifacts/german-austria-iast-setup.exe --stub artifacts/stub/Kbdking.Stub.exe
 
       - name: Create the sample's MSI and Intune package
         shell: pwsh
         run: |
           dotnet tool install --global wix --version 5.0.2
-          artifacts/cli/keyservant.exe package samples/german-austria-iast.keyservant --msi artifacts/german-austria-iast.msi
+          artifacts/cli/kbdking.exe package samples/german-austria-iast.kbdking --msi artifacts/german-austria-iast.msi
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          artifacts/cli/keyservant.exe package samples/german-austria-iast.keyservant --intune artifacts/intune --stub artifacts/stub/Keyservant.Stub.exe
+          artifacts/cli/kbdking.exe package samples/german-austria-iast.kbdking --intune artifacts/intune --stub artifacts/stub/Kbdking.Stub.exe
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       # Installs the MSI quietly, checks the registration and removes it again.
@@ -126,7 +126,7 @@ jobs:
         with:
           name: windows-cli-and-installer
           path: |
-            artifacts/cli/keyservant.exe
+            artifacts/cli/kbdking.exe
             artifacts/german-austria-iast-setup.exe
             artifacts/german-austria-iast.msi
             artifacts/intune/
@@ -143,11 +143,11 @@ jobs:
 
       - name: Install-and-type test
         env:
-          KEYSERVANT_INSTALL_TESTS: "1"
+          KBDKING_INSTALL_TESTS: "1"
         shell: pwsh
         run: |
           Write-Output "OS architecture: $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture), process: $([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)"
-          dotnet test tests/Keyservant.Tests/Keyservant.Tests.csproj -c Release `
+          dotnet test tests/Kbdking.Tests/Kbdking.Tests.csproj -c Release `
             --filter "FullyQualifiedName~WindowsInstallTests" --logger "trx;LogFileName=install.trx" --results-directory TestResults
           $failedRun = $LASTEXITCODE
           foreach ($r in ([xml](Get-Content TestResults/install.trx)).TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' }) {
@@ -170,24 +170,24 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Build (x64)
-        run: dotnet build src/Keyservant.App/Keyservant.App.csproj -c Release -p:Platform=x64
+        run: dotnet build src/Kbdking.App/Kbdking.App.csproj -c Release -p:Platform=x64
 
       - name: Build (ARM64)
-        run: dotnet build src/Keyservant.App/Keyservant.App.csproj -c Release -p:Platform=ARM64
+        run: dotnet build src/Kbdking.App/Kbdking.App.csproj -c Release -p:Platform=ARM64
 
       # Publishes the app the way users do and starts it: it must still be running after 20 seconds.
       - name: Publish and start the app
         shell: pwsh
         env:
-          KEYSERVANT_NO_DIALOGS: "1"
+          KBDKING_NO_DIALOGS: "1"
         run: |
-          dotnet publish src/Keyservant.App/Keyservant.App.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained -o app-out
-          dotnet publish src/Keyservant.Cli/Keyservant.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o app-out
+          dotnet publish src/Kbdking.App/Kbdking.App.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained -o app-out
+          dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o app-out
           Get-ChildItem app-out -Filter *.pri | ForEach-Object { Write-Output "resources: $($_.Name)" }
-          $p = Start-Process -FilePath app-out/Keyservant.App.exe -PassThru
+          $p = Start-Process -FilePath app-out/Kbdking.App.exe -PassThru
           Start-Sleep -Seconds 20
           $p.Refresh()
-          $log = Join-Path $env:LOCALAPPDATA 'Keyservant\crash.log'
+          $log = Join-Path $env:LOCALAPPDATA 'kbdking\crash.log'
           if ($p.HasExited -or (Test-Path $log)) {
             $details = if (Test-Path $log) { Get-Content $log -Raw } else { '' }
             $events = Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue |
@@ -225,22 +225,22 @@ jobs:
         if: matrix.arch == 'x64'
         shell: pwsh
         env:
-          KEYSERVANT_NO_DIALOGS: "1"
+          KBDKING_NO_DIALOGS: "1"
         run: |
-          $msi = (Resolve-Path artifacts/Keyservant-x64.msi).Path
+          $msi = (Resolve-Path artifacts/kbdking-x64.msi).Path
           $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$msi`"", '/qn', '/l*v', 'install.log' -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 40; exit 1 }
-          $dir = Join-Path $env:ProgramFiles 'Keyservant'
-          foreach ($f in 'Keyservant.App.exe', 'keyservant.exe', 'Keyservant.App.pri') {
+          $dir = Join-Path $env:ProgramFiles 'kbdking'
+          foreach ($f in 'Kbdking.App.exe', 'kbdking.exe', 'Kbdking.App.pri') {
             if (-not (Test-Path (Join-Path $dir $f))) { Write-Output "::error title=Installer::$f is missing in $dir"; exit 1 }
           }
-          & (Join-Path $dir 'keyservant.exe') templates
+          & (Join-Path $dir 'kbdking.exe') templates
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          $app = Start-Process -FilePath (Join-Path $dir 'Keyservant.App.exe') -PassThru
+          $app = Start-Process -FilePath (Join-Path $dir 'Kbdking.App.exe') -PassThru
           Start-Sleep -Seconds 20
           $app.Refresh()
           if ($app.HasExited) {
-            $log = Join-Path $env:LOCALAPPDATA 'Keyservant\crash.log'
+            $log = Join-Path $env:LOCALAPPDATA 'kbdking\crash.log'
             $details = if (Test-Path $log) { (Get-Content $log -Raw) -replace '%','%25' -replace "`r",'' -replace "`n",'%0A' } else { '' }
             Write-Output "::error title=Installed app::exited with $($app.ExitCode)%0A$details"
             exit 1
@@ -249,16 +249,16 @@ jobs:
           Write-Output "::notice title=Installed app::window '$($app.MainWindowTitle)' is open"
           Stop-Process -Id $app.Id -Force
           $p = Start-Process msiexec.exe -ArgumentList '/x', "`"$msi`"", '/qn' -Wait -PassThru
-          if ($p.ExitCode -ne 0 -or (Test-Path (Join-Path $dir 'Keyservant.App.exe'))) { Write-Output '::error title=Installer::uninstall failed'; exit 1 }
-          Write-Output "::notice title=Installer::Installed, started and uninstalled Keyservant 0.1.${{ github.run_number }}."
+          if ($p.ExitCode -ne 0 -or (Test-Path (Join-Path $dir 'Kbdking.App.exe'))) { Write-Output '::error title=Installer::uninstall failed'; exit 1 }
+          Write-Output "::notice title=Installer::Installed, started and uninstalled kbdking 0.1.${{ github.run_number }}."
 
       - uses: actions/upload-artifact@v5
         with:
-          name: keyservant-installer-${{ matrix.arch }}
-          path: artifacts/Keyservant-${{ matrix.arch }}.msi
+          name: kbdking-installer-${{ matrix.arch }}
+          path: artifacts/kbdking-${{ matrix.arch }}.msi
 
   # Every push to main updates the "latest" pre-release, so the newest installer is always at
-  # https://github.com/rorugi/keyservant/releases/tag/latest
+  # https://github.com/rorugi/kbdking/releases/tag/latest
   latest:
     name: Publish latest installers
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -272,7 +272,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v5
         with:
-          pattern: keyservant-installer-*
+          pattern: kbdking-installer-*
           merge-multiple: true
           path: dist
 
@@ -284,4 +284,4 @@ jobs:
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest dist/*.msi --prerelease --target "${{ github.sha }}" \
             --title "Latest build (0.1.${{ github.run_number }})" \
-            --notes "Automatic build of the newest commit on main (${GITHUB_SHA::7}). Not signed yet: Windows may warn that it doesn't know the publisher; choose More info → Run anyway. Download Keyservant-x64.msi (or Keyservant-arm64.msi for Windows on ARM) and run it."
+            --notes "Automatic build of the newest commit on main (${GITHUB_SHA::7}). Not signed yet: Windows may warn that it doesn't know the publisher; choose More info → Run anyway. Download kbdking-x64.msi (or kbdking-arm64.msi for Windows on ARM) and run it."

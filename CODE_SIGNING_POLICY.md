@@ -8,9 +8,9 @@ releases are unsigned.*
 
 ## What is signed
 
-- `Keyservant.App.exe` and its assemblies (the Windows app)
-- `keyservant.exe` (command-line tool)
-- `Keyservant.Stub.exe` (standalone installer template)
+- `Kbdking.App.exe` and its assemblies (the Windows app)
+- `kbdking.exe` (command-line tool)
+- `Kbdking.Stub.exe` (standalone installer template)
 
 Layout DLLs and installers that **users build on their own PCs** are not signed by this project, because
 they are not built by the project's CI.
@@ -26,12 +26,12 @@ they are not built by the project's CI.
 
 | Role | Members |
 | --- | --- |
-| Committers and reviewers | [Repository maintainers](https://github.com/rorugi/keyservant/graphs/contributors) |
+| Committers and reviewers | [Repository maintainers](https://github.com/rorugi/kbdking/graphs/contributors) |
 | Approvers | Repository owner |
 
 All team members use multi-factor authentication for GitHub and SignPath.
 
 ## Privacy
 
-Keyservant does not transfer any information to other networked systems unless specifically requested by
+kbdking does not transfer any information to other networked systems unless specifically requested by
 the user or the person installing or operating it.

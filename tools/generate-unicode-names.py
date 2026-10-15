@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerates src/Keyservant.Core/Unicode/UnicodeNames.txt.gz from Python's unicodedata module.
+"""Regenerates src/Kbdking.Core/Unicode/UnicodeNames.txt.gz from Python's unicodedata module.
 
 Format (UTF-8, one line per character): <hex code point>;<name>[;<alias>...]
 Algorithmically named ranges (CJK ideographs, Hangul syllables, ...) are left out; the C# side
@@ -12,7 +12,7 @@ from pathlib import Path
 SKIP = ("CJK UNIFIED IDEOGRAPH", "HANGUL SYLLABLE", "TANGUT IDEOGRAPH", "CJK COMPATIBILITY IDEOGRAPH",
         "KHITAN SMALL SCRIPT", "NUSHU CHARACTER", "EGYPTIAN HIEROGLYPH")
 
-out = Path(__file__).resolve().parent.parent / "src/Keyservant.Core/Unicode/UnicodeNames.txt.gz"
+out = Path(__file__).resolve().parent.parent / "src/Kbdking.Core/Unicode/UnicodeNames.txt.gz"
 lines = [f"#unicode {unicodedata.unidata_version}"]
 for cp in range(0x110000):
     if 0xD800 <= cp <= 0xDFFF or 0xE000 <= cp <= 0xF8FF or cp >= 0xF0000:
