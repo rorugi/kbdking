@@ -121,11 +121,22 @@ public sealed partial class EditorView : UserControl
     /// <summary>Shows the tab with this topic id (e.g. "tab-deadkeys"), also inside Advanced.</summary>
     internal void SelectTab(string topic)
     {
+        if (!IsLoaded)
+        {
+            // The tab bars select their first tab when they load; choose the tab afterwards.
+            void OnLoaded(object sender, RoutedEventArgs e)
+            {
+                Loaded -= OnLoaded;
+                DispatcherQueue.TryEnqueue(() => SelectTab(topic));
+            }
+            Loaded += OnLoaded;
+            return;
+        }
         foreach (var (bar, parent) in new[] { (EditorTabs, (string?)null), (AdvancedTabs, "advanced") })
         {
             if (bar.Items.FirstOrDefault(i => i.Tag as string == topic) is not { } item) continue;
-            if (parent is not null) EditorTabs.SelectedItem = EditorTabs.Items.First(i => i.Tag as string == parent);
-            bar.SelectedItem = item;
+            if (parent is not null) EditorTabs.Items.First(i => i.Tag as string == parent).IsSelected = true;
+            item.IsSelected = true;
             ShowSelectedPages();
             if (topic == "tab-deadkeys" && ViewModel.DeadKeys.Selected is { } selected)
                 DispatcherQueue.TryEnqueue(() => DeadKeyList.ScrollIntoView(selected));

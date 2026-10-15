@@ -43,7 +43,9 @@
                 VerticalAlignment="Center"
                 Style="{StaticResource SubtitleTextBlockStyle}"
                 Text="{x:Bind ViewModel.Title, Mode=OneWay}"
-                TextTrimming="CharacterEllipsis" />
+                ToolTipService.ToolTip="{x:Bind ViewModel.Title, Mode=OneWay}"
+                TextTrimming="CharacterEllipsis"
+                TextWrapping="NoWrap" />
             <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Right" IsOpen="False">
                 <AppBarButton Icon="Undo" Label="Undo" Command="{x:Bind ViewModel.UndoCommand}" ToolTipService.ToolTip="Undo (Ctrl+Z)">
                     <AppBarButton.KeyboardAccelerators>
