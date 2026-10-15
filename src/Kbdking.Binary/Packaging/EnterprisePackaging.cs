@@ -60,7 +60,7 @@ public static class EnterprisePackaging
                     <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Control\Keyboard Layouts\{klid}">
                       <RegistryValue Name="Layout File" Type="string" Value="{E(package.DllFileName)}" KeyPath="yes" />
                       <RegistryValue Name="Layout Text" Type="string" Value="{F(package.Name)}" />
-                      <RegistryValue Name="Layout Display Name" Type="expandable" Value="@%SystemRoot%\system32\{E(package.DllFileName)},-1000" />
+                      <RegistryValue Name="Layout Display Name" Type="expandable" Value="{E(package.DisplayNameReference)}" />
                       <RegistryValue Name="Layout Id" Type="string" Value="{MsiLayoutId(package)}" />
                       <RegistryValue Name="kbdking" Type="string" Value="{F(package.Version)}" />
                     </RegistryKey>

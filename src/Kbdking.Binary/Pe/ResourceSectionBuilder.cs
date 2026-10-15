@@ -14,11 +14,24 @@ internal sealed record VersionInfo(
 
 /// <summary>
 /// Builds a .rsrc section with a string table (the layout's display name, referenced from the registry
-/// as <c>@%SystemRoot%\system32\kbdxxx.dll,-1000</c>) and a version resource.
+/// as <c>@%SystemRoot%\system32\kbdxxx.dll,-&lt;id&gt;</c>) and a version resource.
 /// </summary>
 internal static class ResourceSectionBuilder
 {
-    public const int DisplayNameStringId = 1000;
+    /// <summary>
+    /// The string ID of the display name. It is derived from the name: Windows caches these strings per file and
+    /// ID (the MUI cache), so with a fixed ID a renamed layout kept showing its old name in the language switcher.
+    /// </summary>
+    public static int DisplayNameStringId(string name)
+    {
+        var hash = 2166136261u; // FNV-1a: stable across runs and machines
+        foreach (var c in name)
+        {
+            hash ^= c;
+            hash *= 16777619;
+        }
+        return 2000 + (int)(hash % 30000);
+    }
 
     private const int RtString = 6;
     private const int RtVersion = 16;
@@ -29,7 +42,7 @@ internal static class ResourceSectionBuilder
     {
         var resources = new List<(int Type, int Id, ushort Lang, byte[] Data)>
         {
-            (RtString, DisplayNameStringId / 16 + 1, LangNeutral, StringBlock(DisplayNameStringId % 16, displayName)),
+            (RtString, DisplayNameStringId(displayName) / 16 + 1, LangNeutral, StringBlock(DisplayNameStringId(displayName) % 16, displayName)),
             (RtVersion, 1, LangEnUs, VersionResource(version)),
         };
         resources.Sort((a, b) => a.Type.CompareTo(b.Type));

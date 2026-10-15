@@ -133,10 +133,16 @@ public class LayoutDllTests
     }
 
     [Fact]
-    public void Display_name_resource_points_at_string_1000()
+    public void Display_name_resource_id_changes_with_the_name()
     {
-        var result = LayoutDllBuilder.Build(LayoutTemplates.UnitedStates());
-        Assert.Equal(@"@%SystemRoot%\system32\kbdks.dll,-1000", result.DisplayNameResource);
+        var layout = LayoutTemplates.UnitedStates();
+        var result = LayoutDllBuilder.Build(layout);
+        var id = ResourceSectionBuilder.DisplayNameStringId(layout.Metadata.Name);
+        Assert.InRange(id, 2000, 31999);
+        Assert.Equal($@"@%SystemRoot%\system32\kbdks.dll,-{id}", result.DisplayNameResource);
+        // Windows caches names by file and ID, so a renamed layout must use another ID.
+        Assert.NotEqual(id, ResourceSectionBuilder.DisplayNameStringId(layout.Metadata.Name + " 2"));
+        Assert.Equal(id, ResourceSectionBuilder.DisplayNameStringId(layout.Metadata.Name));
     }
 
     [Fact]
@@ -176,5 +182,22 @@ public class LayoutDllTests
         var c = Binary.Kbd.KbdCSourceWriter.Write(TestLayouts.Everything());
         foreach (var name in new[] { "aVkToBits", "CharModifiers", "aVkToWch", "aVkToWchNumpad", "aLigature", "aDeadKey", "aKeyNames", "aKeyNamesDead", "ausVK", "aE0VscToVk", "KbdTables", "KbdLayerDescriptor" })
             Assert.Contains(name, c);
+    }
+}
+
+public class DisplayNamePackageTests
+{
+    [Fact]
+    public void Packages_remember_the_string_id_of_the_name()
+    {
+        var layout = Kbdking.Core.Templates.LayoutTemplates.UnitedStates();
+        var package = Kbdking.Binary.Packaging.LayoutPackage.Create(layout, LayoutDllBuilder.Build(layout));
+        Assert.Equal(ResourceSectionBuilder.DisplayNameStringId(layout.Metadata.Name), package.DisplayNameId);
+        using var stream = new MemoryStream();
+        package.WriteTo(stream);
+        stream.Position = 0;
+        var read = Kbdking.Binary.Packaging.LayoutPackage.ReadFrom(stream);
+        Assert.Equal(package.DisplayNameId, read.DisplayNameId);
+        Assert.Equal($@"@%SystemRoot%\system32\{package.DllFileName},-{package.DisplayNameId}", read.DisplayNameReference);
     }
 }

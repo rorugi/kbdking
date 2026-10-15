@@ -24,6 +24,12 @@ public sealed class LayoutPackage
     /// <summary>The KLID if the layout already has one; otherwise the installer assigns one.</summary>
     public string? LayoutId { get; init; }
 
+    /// <summary>String ID of the layout name inside the DLL (1000 in packages made before it followed the name).</summary>
+    public int DisplayNameId { get; init; } = 1000;
+
+    /// <summary>The "Layout Display Name" registry value: where Windows finds the name.</summary>
+    public string DisplayNameReference => $"@%SystemRoot%\\system32\\{DllFileName},-{DisplayNameId}";
+
     public required byte[] DllX64 { get; init; }
     public byte[]? DllWow64 { get; init; }
     public byte[]? DllArm64 { get; init; }
@@ -39,6 +45,7 @@ public sealed class LayoutPackage
         LanguageId = layout.Metadata.LanguageId,
         Version = layout.Metadata.Version,
         LayoutId = layout.Metadata.LayoutId,
+        DisplayNameId = Pe.ResourceSectionBuilder.DisplayNameStringId(build.DisplayName),
         DllX64 = build.X64,
         DllWow64 = build.Wow64,
         DllArm64 = build.Arm64,
@@ -66,6 +73,7 @@ public sealed class LayoutPackage
             ["layoutVersion"] = Version,
             ["layoutId"] = LayoutId,
             ["hasWow64"] = DllWow64 is not null,
+            ["displayNameId"] = DisplayNameId,
         };
         var entries = new List<(string Name, byte[] Data)>
         {
@@ -132,6 +140,7 @@ public sealed class LayoutPackage
             LanguageId = (ushort)manifest["languageId"]!.GetValue<int>(),
             Version = manifest["layoutVersion"]?.GetValue<string>() ?? "1.0",
             LayoutId = layoutId,
+            DisplayNameId = manifest["displayNameId"]?.GetValue<int>() is int id and >= 1 and <= 65535 ? id : 1000,
             DllX64 = entries["x64/" + dll],
             DllWow64 = entries.GetValueOrDefault("wow64/" + dll),
             DllArm64 = entries.GetValueOrDefault("arm64/" + dll),

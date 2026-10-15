@@ -195,6 +195,33 @@ public partial class WindowsInstallTests
         }
     }
 
+    /// <summary>
+    /// Windows caches layout names by DLL and string ID; a renamed layout must still show its new name
+    /// (in the language switcher and here, which both resolve "Layout Display Name").
+    /// </summary>
+    [WindowsInstallFact]
+    public void Renamed_layouts_show_their_new_name()
+    {
+        var layout = TestLayouts.Sample("german-austria-iast");
+        layout.Metadata.DllName = "kbdksnam";
+        layout.Metadata.Name = "kbdking name test A";
+        var system = new WindowsLayoutSystem();
+        var installed = system.Install(LayoutPackage.Create(layout, LayoutDllBuilder.Build(layout)));
+        try
+        {
+            Assert.Equal("kbdking name test A", system.GetLayouts().Single(l => l.Klid == installed.Klid).Name);
+            layout.Metadata.Name = "kbdking name test B";
+            layout.Metadata.LayoutId = installed.Klid;
+            var again = system.Install(LayoutPackage.Create(layout, LayoutDllBuilder.Build(layout)));
+            Assert.Equal(installed.Klid, again.Klid);
+            Assert.Equal("kbdking name test B", system.GetLayouts().Single(l => l.Klid == installed.Klid).Name);
+        }
+        finally
+        {
+            system.Uninstall(installed.Klid);
+        }
+    }
+
     private static bool TaskExists(string klid)
     {
         using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("schtasks.exe", ["/Query", "/TN", $@"{WindowsLayoutSystem.TaskFolder}\Revert {klid}"])

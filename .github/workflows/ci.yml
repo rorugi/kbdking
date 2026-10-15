@@ -86,7 +86,7 @@ jobs:
           $counters = ([xml](Get-Content TestResults/install.trx)).TestRun.ResultSummary.Counters
           Write-Output "::notice title=Install-and-type test::passed=$($counters.passed) failed=$($counters.failed) skipped=$($counters.notExecuted)"
           # The test must actually run here; a skip would hide a broken setup.
-          if ($failedRun -ne 0 -or [int]$counters.passed -lt 5) { exit 1 }
+          if ($failedRun -ne 0 -or [int]$counters.passed -lt 6) { exit 1 }
 
       - name: Publish CLI
         run: dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o artifacts/cli
@@ -157,7 +157,7 @@ jobs:
           }
           $counters = ([xml](Get-Content TestResults/install.trx)).TestRun.ResultSummary.Counters
           Write-Output "::notice title=ARM64 install-and-type test::passed=$($counters.passed) failed=$($counters.failed) skipped=$($counters.notExecuted)"
-          if ($failedRun -ne 0 -or [int]$counters.passed -lt 5) { exit 1 }
+          if ($failedRun -ne 0 -or [int]$counters.passed -lt 6) { exit 1 }
 
   app:
     name: App (WinUI 3)

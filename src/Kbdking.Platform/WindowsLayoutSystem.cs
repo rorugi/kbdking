@@ -150,7 +150,7 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
         {
             key.SetValue("Layout File", package.DllFileName);
             key.SetValue("Layout Text", package.Name);
-            key.SetValue("Layout Display Name", $"@%SystemRoot%\\system32\\{package.DllFileName},-1000", RegistryValueKind.ExpandString);
+            key.SetValue("Layout Display Name", package.DisplayNameReference, RegistryValueKind.ExpandString);
             if (key.GetValue("Layout Id") is not string)
                 key.SetValue("Layout Id", AllocateLayoutId(root));
             key.SetValue(MarkerValue, package.Version);

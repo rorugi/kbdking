@@ -30,8 +30,15 @@ public sealed class LayoutBuildResult
     public byte[]? Arm64 { get; init; }
     public required ValidationResult Validation { get; init; }
 
+    /// <summary>The layout name stored in the DLL.</summary>
+    public string DisplayName { get; init; } = "";
+
     /// <summary>Registry value for "Layout Display Name", pointing at the string resource in the DLL.</summary>
-    public string DisplayNameResource => $"@%SystemRoot%\\system32\\{FileName},-{ResourceSectionBuilder.DisplayNameStringId}";
+    public string DisplayNameResource => DisplayNameReference(FileName, DisplayName);
+
+    /// <summary>"@%SystemRoot%\system32\kbdxxx.dll,-id": where Windows finds the layout's name.</summary>
+    public static string DisplayNameReference(string fileName, string displayName) =>
+        $"@%SystemRoot%\\system32\\{fileName},-{ResourceSectionBuilder.DisplayNameStringId(displayName)}";
 }
 
 /// <summary>The layout has validation errors and can't be built.</summary>
@@ -57,6 +64,7 @@ public static class LayoutDllBuilder
         return new LayoutBuildResult
         {
             FileName = fileName,
+            DisplayName = layout.Metadata.Name,
             X64 = BuildImage(layout, LayoutArchitecture.X64, fileName, options),
             Wow64 = options.IncludeWow64 ? BuildImage(layout, LayoutArchitecture.X86Wow64, fileName, options) : null,
             Arm64 = options.IncludeArm64 ? BuildImage(layout, LayoutArchitecture.Arm64, fileName, options) : null,
