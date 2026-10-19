@@ -176,6 +176,7 @@ public sealed class AnalysisViewModel : ObservableObject
     private string _text = "";
     private string _summary = "Paste a text you type often (or load a file) and press Analyze.";
     private string? _heatmapSvg;
+    private KeyboardPicture? _heatmap;
     private string? _comparison;
     private TextAnalysis? _last;
 
@@ -193,6 +194,9 @@ public sealed class AnalysisViewModel : ObservableObject
     public string Summary { get => _summary; private set => SetProperty(ref _summary, value); }
 
     /// <summary>The heatmap as SVG; the view renders it.</summary>
+    /// <summary>The heatmap for the app to draw (SVG text isn't shown by WinUI's SVG images).</summary>
+    public KeyboardPicture? Heatmap { get => _heatmap; private set => SetProperty(ref _heatmap, value); }
+
     public string? HeatmapSvg { get => _heatmapSvg; private set { if (SetProperty(ref _heatmapSvg, value)) ((AsyncRelayCommand)SaveHeatmapCommand).NotifyCanExecuteChanged(); } }
 
     public string? Comparison { get => _comparison; private set => SetProperty(ref _comparison, value); }
@@ -226,7 +230,9 @@ public sealed class AnalysisViewModel : ObservableObject
         Untypeable.Clear();
         foreach (var c in analysis.Untypeable.OrderByDescending(c => c.Count))
             Untypeable.Add(new CharacterRow(c.Text, c.Count, "", "—"));
-        HeatmapSvg = KeyboardSvgRenderer.Render(layout, new RenderOptions { Heat = analysis.KeyPresses, Shape = _editor.Shape, Title = "Key presses" });
+        var options = new RenderOptions { Heat = analysis.KeyPresses, Shape = _editor.Shape, Title = "Key presses" };
+        Heatmap = KeyboardSvgRenderer.Picture(layout, options);
+        HeatmapSvg = KeyboardSvgRenderer.Render(layout, options);
     }
 
     /// <summary>Sends the untypeable characters to the assistant.</summary>
@@ -406,6 +412,7 @@ public sealed class CompareViewModel : ObservableObject
     private readonly EditorViewModel _editor;
     private string _summary = "Compare this layout with another layout file, or with the version saved on disk.";
     private string? _diffSvg;
+    private KeyboardPicture? _diffPicture;
     private KeyboardLayout? _other;
     private string? _otherName;
     private bool _highlightOnKeyboard = true;
@@ -424,6 +431,9 @@ public sealed class CompareViewModel : ObservableObject
 
     /// <summary>The current layout with changed keys highlighted, as SVG.</summary>
     public string? DiffSvg { get => _diffSvg; private set => SetProperty(ref _diffSvg, value); }
+
+    /// <summary>The comparison picture for the app to draw.</summary>
+    public KeyboardPicture? DiffPicture { get => _diffPicture; private set => SetProperty(ref _diffPicture, value); }
 
     public bool HighlightOnKeyboard
     {
@@ -480,6 +490,7 @@ public sealed class CompareViewModel : ObservableObject
         _other = null;
         Changes.Clear();
         DiffSvg = null;
+        DiffPicture = null;
         Summary = "Compare this layout with another layout file, or with the version saved on disk.";
         _editor.Highlight([]);
     }
@@ -492,7 +503,9 @@ public sealed class CompareViewModel : ObservableObject
         foreach (var c in changes) Changes.Add(c);
         var keys = changes.Where(c => c.VirtualKey is not null).Select(c => c.VirtualKey!.Value).ToHashSet();
         Summary = changes.Count == 0 ? $"No differences from {_otherName}." : $"{changes.Count} differences from {_otherName} ({keys.Count} keys). Changed keys are marked.";
-        DiffSvg = KeyboardSvgRenderer.Render(_editor.Layout, new RenderOptions { Highlight = keys, Shape = _editor.Shape, Title = $"Changed since {_otherName}" });
+        var diffOptions = new RenderOptions { Highlight = keys, Shape = _editor.Shape, Title = $"Changed since {_otherName}" };
+        DiffPicture = KeyboardSvgRenderer.Picture(_editor.Layout, diffOptions);
+        DiffSvg = KeyboardSvgRenderer.Render(_editor.Layout, diffOptions);
         _editor.Highlight(_highlightOnKeyboard ? keys : []);
     }
 }

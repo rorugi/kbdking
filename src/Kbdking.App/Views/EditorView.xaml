@@ -560,7 +560,7 @@
                         </StackPanel>
                         <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Analysis.Summary, Mode=OneWay}" TextWrapping="Wrap" />
                         <TextBlock Text="{x:Bind ViewModel.Analysis.Comparison, Mode=OneWay}" TextWrapping="Wrap" Visibility="{x:Bind local:Converters.VisibleIfText(ViewModel.Analysis.Comparison), Mode=OneWay}" />
-                        <Image x:Name="HeatmapImage" MaxWidth="1100" HorizontalAlignment="Left" Stretch="Uniform" />
+                        <Viewbox x:Name="HeatmapView" MaxWidth="1100" HorizontalAlignment="Left" Stretch="Uniform" StretchDirection="DownOnly" />
                         <Grid ColumnSpacing="24">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -661,7 +661,7 @@
                         <CheckBox Content="Mark changed keys on the Keys tab" IsChecked="{x:Bind ViewModel.Compare.HighlightOnKeyboard, Mode=TwoWay}" />
                     </StackPanel>
                     <TextBlock Grid.Row="1" Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.Compare.Summary, Mode=OneWay}" TextWrapping="Wrap" />
-                    <Image x:Name="DiffImage" Grid.Row="2" MaxWidth="1100" MaxHeight="360" HorizontalAlignment="Left" Stretch="Uniform" />
+                    <Viewbox x:Name="DiffView" Grid.Row="2" MaxWidth="1100" MaxHeight="360" HorizontalAlignment="Left" Stretch="Uniform" StretchDirection="DownOnly" />
                     <ListView Grid.Row="3" ItemsSource="{x:Bind ViewModel.Compare.Changes}" SelectionMode="None">
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="diff:LayoutChange">

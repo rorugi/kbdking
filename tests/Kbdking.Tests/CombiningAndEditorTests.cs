@@ -216,3 +216,20 @@ public partial class PresentationTests
         Assert.NotNull(editor.Analysis.HeatmapSvg);
     }
 }
+
+public class KeyboardPictureTests
+{
+    [Fact]
+    public void Pictures_carry_the_characters_and_colours_of_every_key()
+    {
+        var layout = TestLayouts.Sample("german-austria-iast");
+        var picture = Kbdking.Core.Rendering.KeyboardSvgRenderer.Picture(layout, new Kbdking.Core.Rendering.RenderOptions { Heat = new Dictionary<byte, int> { [(byte)'A'] = 10, [(byte)'S'] = 5 } });
+        var a = picture.Keys.Single(k => k.Row == 2 && k.Base?.Text == "a");
+        Assert.Equal("A", a.Shift?.Text);
+        Assert.Equal("ā", a.AltGr?.Text);
+        Assert.Equal(10, a.Count);
+        Assert.NotEqual("#fafafa", a.Fill);
+        Assert.Contains(picture.Keys, k => k.FixedLabel == "AltGr");
+        Assert.Contains(picture.Keys, k => k.AltGr is { IsDead: true }); // dot-below dead key on AltGr+.
+    }
+}

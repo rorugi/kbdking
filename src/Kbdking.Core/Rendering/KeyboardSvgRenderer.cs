@@ -30,6 +30,17 @@ public sealed record RenderOptions
     public double StickerSize { get; init; } = 12;
 }
 
+/// <summary>A character on a key in a <see cref="KeyboardPicture"/>.</summary>
+public sealed record PictureLabel(string Text, bool IsDead);
+
+/// <summary>One key of a <see cref="KeyboardPicture"/>; positions and sizes in key units.</summary>
+public sealed record PictureKey(
+    double X, int Row, double Width, string Fill, string? FixedLabel,
+    PictureLabel? Base, PictureLabel? Shift, PictureLabel? AltGr, PictureLabel? ShiftAltGr, int Count);
+
+/// <summary>A keyboard picture (heatmap, comparison) as data, for drawing it with native controls.</summary>
+public sealed record KeyboardPicture(double Width, int Rows, string? Title, IReadOnlyList<PictureKey> Keys);
+
 /// <summary>
 /// Draws a layout as SVG in millimetres (1 key unit = 19.05 mm), so it prints at real size: the full
 /// keyboard, a heatmap, a comparison, or a sheet of key stickers. Each key shows up to four characters:
@@ -48,32 +59,76 @@ public static class KeyboardSvgRenderer
         return options.Mode == RenderMode.Stickers ? Stickers(effective, options) : Keyboard(effective, options);
     }
 
-    private static string Keyboard(KeyboardLayout layout, RenderOptions o)
+    /// <summary>The keyboard picture as data: every key with its colour and characters.</summary>
+    public static KeyboardPicture Picture(KeyboardLayout layout, RenderOptions? options = null)
+    {
+        options ??= new RenderOptions();
+        return PictureOf(Compose.ComposeCompiler.Compile(layout).Layout, options);
+    }
+
+    /// <summary>The picture of a layout whose compose sequences are already compiled.</summary>
+    private static KeyboardPicture PictureOf(KeyboardLayout layout, RenderOptions o)
     {
         var rows = KeyboardGeometry.Rows(o.Shape);
-        var width = rows.Max(r => r.Sum(k => k.Width)) * Unit;
-        var titleHeight = o.Title is null ? 0 : 10;
-        var height = rows.Count * Unit + titleHeight;
         var maxHeat = o.Heat is { Count: > 0 } h ? h.Values.Max() : 0;
+        var keys = new List<PictureKey>();
+        foreach (var key in rows.SelectMany(r => r))
+        {
+            var vk = VirtualKeyOf(layout, key);
+            var fill = "#fafafa";
+            if (key.FixedLabel is not null) fill = "#e8e8e8";
+            if (key.FixedLabel is null && vk is { } v && o.Heat is not null && maxHeat > 0) fill = HeatColor(o.Heat.GetValueOrDefault(v) / (double)maxHeat);
+            if (vk is { } hv && o.Highlight?.Contains(hv) == true) fill = "#cfe3ff";
+            var count = vk is { } cv && o.Heat is not null ? o.Heat.GetValueOrDefault(cv) : 0;
+            if (key.FixedLabel is not null)
+            {
+                var label = key.FixedLabel == "AltGr" && !layout.Flags.HasFlag(LocaleFlags.AltGr) ? "Alt" : key.FixedLabel;
+                keys.Add(new PictureKey(key.X, key.Row, key.Width, fill, label, null, null, null, null, count));
+                continue;
+            }
+            var def = vk is { } dv ? layout.FindKey(dv) : null;
+            PictureLabel? Label(ShiftState state)
+            {
+                var output = def is null ? null : layout.Modifiers.Canonicalize(state) is { } c ? def.Outputs.GetValueOrDefault(c) : null;
+                return output is null || Display(output).Length == 0 ? null : new PictureLabel(Display(output), output.IsDead);
+            }
+            keys.Add(new PictureKey(key.X, key.Row, key.Width, fill, null,
+                Label(ShiftState.Base), Label(ShiftState.Shift), Label(ShiftState.AltGr), Label(ShiftState.ShiftAltGr), count));
+        }
+        return new KeyboardPicture(rows.Max(r => r.Sum(k => k.Width)), rows.Count, o.Title, keys);
+    }
+
+    private static string Keyboard(KeyboardLayout layout, RenderOptions o)
+    {
+        var picture = PictureOf(layout, o);
+        var width = picture.Width * Unit;
+        var titleHeight = o.Title is null ? 0 : 10;
+        var height = picture.Rows * Unit + titleHeight;
 
         var sb = Header(width + 4, height + 4);
         if (o.Title is not null) Text(sb, 2, 7, 5, o.Title, "start", "#222", bold: true);
-        foreach (var row in rows)
+        foreach (var key in picture.Keys)
         {
-            foreach (var key in row)
+            var x = 2 + key.X * Unit;
+            var y = 2 + titleHeight + key.Row * Unit;
+            var w = key.Width * Unit;
+            sb.Append(Inv($"<rect x=\"{x + Gap / 2:0.##}\" y=\"{y + Gap / 2:0.##}\" width=\"{w - Gap:0.##}\" height=\"{Unit - Gap:0.##}\" rx=\"1.6\" fill=\"{key.Fill}\" stroke=\"#888\" stroke-width=\"0.3\"/>\n"));
+            if (key.FixedLabel is not null)
             {
-                var x = 2 + key.X * Unit;
-                var y = 2 + titleHeight + key.Row * Unit;
-                var vk = VirtualKeyOf(layout, key);
-                var fill = "#fafafa";
-                if (key.FixedLabel is not null) fill = "#e8e8e8";
-                if (key.FixedLabel is null && vk is { } v && o.Heat is not null && maxHeat > 0) fill = HeatColor(o.Heat.GetValueOrDefault(v) / (double)maxHeat);
-                if (vk is { } hv && o.Highlight?.Contains(hv) == true) fill = "#cfe3ff";
-                sb.Append(Inv($"<rect x=\"{x + Gap / 2:0.##}\" y=\"{y + Gap / 2:0.##}\" width=\"{key.Width * Unit - Gap:0.##}\" height=\"{Unit - Gap:0.##}\" rx=\"1.6\" fill=\"{fill}\" stroke=\"#888\" stroke-width=\"0.3\"/>\n"));
-                DrawLabels(sb, layout, key, vk, x, y, key.Width * Unit, Unit, small: false);
-                if (vk is { } cv && o.Heat is not null && o.Heat.GetValueOrDefault(cv) is > 0 and var count)
-                    Text(sb, x + key.Width * Unit / 2, y + Unit / 2 + 1.2, 2.4, count.ToString(CultureInfo.InvariantCulture), "middle", "#00000080");
+                Text(sb, x + w / 2, y + Unit / 2 + 1.2, 3, key.FixedLabel, "middle", "#444");
+                continue;
             }
+            const double big = 6.0, little = 4.2, pad = 2.2;
+            void Corner(PictureLabel? label, double cx, double cy, double fs, string anchor)
+            {
+                if (label is not null) Text(sb, cx, cy, fs, label.Text, anchor, label.IsDead ? "#d9480f" : "#111");
+            }
+            Corner(key.Base, x + pad, y + Unit - pad, big, "start");
+            Corner(key.Shift, x + pad, y + pad + little, little, "start");
+            Corner(key.AltGr, x + w - pad, y + Unit - pad, little, "end");
+            Corner(key.ShiftAltGr, x + w - pad, y + pad + little, little, "end");
+            if (key.Count > 0)
+                Text(sb, x + w / 2, y + Unit / 2 + 1.2, 2.4, key.Count.ToString(CultureInfo.InvariantCulture), "middle", "#00000080");
         }
         sb.Append("</svg>\n");
         return sb.ToString();

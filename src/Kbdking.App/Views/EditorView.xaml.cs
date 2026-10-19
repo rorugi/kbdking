@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Text;
 using Kbdking.Core.Unicode;
 using Kbdking.Presentation;
 using Microsoft.UI.Input;
@@ -8,8 +7,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media.Imaging;
-using Windows.Storage.Streams;
 using Windows.System;
 using Windows.UI.Core;
 
@@ -228,36 +225,10 @@ public sealed partial class EditorView : UserControl
 
     // ---------------------------------------------------------------- pictures
 
-    private async void OnToolPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnToolPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(AnalysisViewModel.HeatmapSvg)) await ShowSvgAsync(HeatmapImage, ViewModel.Analysis.HeatmapSvg);
-        else if (e.PropertyName == nameof(CompareViewModel.DiffSvg)) await ShowSvgAsync(DiffImage, ViewModel.Compare.DiffSvg);
-    }
-
-    private readonly Dictionary<Image, int> _svgVersions = [];
-
-    /// <summary>Shows SVG text in an image. Renders can overlap; only the newest one is shown.</summary>
-    private async Task ShowSvgAsync(Image image, string? svg)
-    {
-        var version = _svgVersions[image] = _svgVersions.GetValueOrDefault(image) + 1;
-        if (svg is null)
-        {
-            image.Source = null;
-            return;
-        }
-        var source = new SvgImageSource { RasterizePixelWidth = 1600 };
-        using var stream = new InMemoryRandomAccessStream();
-        using (var writer = new DataWriter(stream))
-        {
-            writer.WriteBytes(Encoding.UTF8.GetBytes(svg));
-            await writer.StoreAsync();
-            await writer.FlushAsync();
-            writer.DetachStream();
-        }
-        stream.Seek(0);
-        var status = await source.SetSourceAsync(stream);
-        if (version != _svgVersions[image]) return; // a newer picture is on its way
-        image.Source = status == SvgImageSourceLoadStatus.Success ? source : null;
+        if (e.PropertyName == nameof(AnalysisViewModel.Heatmap)) HeatmapView.Child = KeyboardPictureView.Create(ViewModel.Analysis.Heatmap);
+        else if (e.PropertyName == nameof(CompareViewModel.DiffPicture)) DiffView.Child = KeyboardPictureView.Create(ViewModel.Compare.DiffPicture);
     }
 
     private void SendToAssistant_Click(object sender, RoutedEventArgs e) => ViewModel.Analysis.SendUntypeableToAssistant();
