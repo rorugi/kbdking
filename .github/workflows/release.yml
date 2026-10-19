@@ -3,6 +3,13 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Or start it by hand: Actions → Release → Run workflow, enter the version (e.g. 0.1.0). The tag v<version>
+  # is created on the commit the workflow runs on.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, e.g. 0.1.0"
+        required: true
 
 permissions:
   contents: write
@@ -25,8 +32,10 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $v = "${{ github.ref_name }}".TrimStart("v")
+          $v = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.version }}".Trim().TrimStart("v") } else { "${{ github.ref_name }}".TrimStart("v") }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { Write-Output "::error::Version '$v' must look like 1.2.3"; exit 1 }
           "version=$v" >> $env:GITHUB_OUTPUT
+          "tag=v$v" >> $env:GITHUB_OUTPUT
 
       - name: Test
         run: dotnet test tests/Kbdking.Tests/Kbdking.Tests.csproj -c Release
@@ -80,4 +89,4 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" "kbdking-${{ steps.version.outputs.version }}-win-x64.zip" "kbdking-${{ steps.version.outputs.version }}-win-arm64.zip" artifacts/kbdking-x64.msi artifacts/kbdking-arm64.msi --title "kbdking ${{ steps.version.outputs.version }}" --generate-notes
+        run: gh release create "${{ steps.version.outputs.tag }}" --target "${{ github.sha }}" "kbdking-${{ steps.version.outputs.version }}-win-x64.zip" "kbdking-${{ steps.version.outputs.version }}-win-arm64.zip" artifacts/kbdking-x64.msi artifacts/kbdking-arm64.msi --title "kbdking ${{ steps.version.outputs.version }}" --generate-notes
