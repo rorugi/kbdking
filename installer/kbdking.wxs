@@ -18,6 +18,9 @@
     <SummaryInformation Description="kbdking: create, edit and install Windows keyboard layouts" />
     <!-- Any version replaces any other: a release installs over a newer test build and the other way round. -->
     <MajorUpgrade AllowDowngrades="yes" />
+    <!-- Always write the program files: without "a", Windows Installer skips files whose installed copy has a
+         higher file version and then removes that copy with the old version, leaving the app incomplete. -->
+    <Property Id="REINSTALLMODE" Value="amus" />
     <!-- Same UpgradeCode as the old "Keyservant" installer, so installing kbdking replaces it. -->
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 

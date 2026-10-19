@@ -344,6 +344,25 @@ jobs:
           if ($p.ExitCode -ne 0 -or (Test-Path (Join-Path $dir 'Kbdking.App.exe'))) { Write-Output '::error title=Installer::uninstall failed'; exit 1 }
           Write-Output "::notice title=Installer::Installed, started and uninstalled kbdking ${{ steps.version.outputs.version }}."
 
+      # Installing an older version over a newer one must leave a complete app (all files replaced).
+      - name: Install an older version over this one
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        run: |
+          $new = (Resolve-Path artifacts/kbdking-x64.msi).Path
+          $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$new`"", '/qn' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Output "::error title=Downgrade::installing the new version failed ($($p.ExitCode))"; exit 1 }
+          ./tools/build-installer.ps1 -Arch x64 -Version 0.0.1 -Output older
+          $old = (Resolve-Path older/kbdking-x64.msi).Path
+          $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$old`"", '/qn', '/l*v', 'downgrade.log' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content downgrade.log -Tail 40; Write-Output "::error title=Downgrade::installing 0.0.1 over the new version failed ($($p.ExitCode))"; exit 1 }
+          $dir = Join-Path $env:ProgramFiles 'kbdking'
+          $missing = @('Kbdking.App.exe', 'kbdking.exe', 'Kbdking.App.pri', 'Kbdking.Core.dll') | Where-Object { -not (Test-Path (Join-Path $dir $_)) }
+          $version = (Get-Item (Join-Path $dir 'Kbdking.App.exe') -ErrorAction SilentlyContinue).VersionInfo.FileVersion
+          Start-Process msiexec.exe -ArgumentList '/x', "`"$old`"", '/qn' -Wait | Out-Null
+          if ($missing) { Write-Output "::error title=Downgrade::missing after installing an older version: $($missing -join ', ')"; exit 1 }
+          Write-Output "::notice title=Downgrade::0.0.1 installed over ${{ steps.version.outputs.version }} completely (app file version $version)"
+
       - uses: actions/upload-artifact@v5
         with:
           name: kbdking-installer-${{ matrix.arch }}
