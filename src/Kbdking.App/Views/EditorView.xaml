@@ -287,7 +287,7 @@
             <Grid Visibility="Collapsed">
                 <Grid ColumnSpacing="24" Padding="0,8">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="260" />
+                        <ColumnDefinition Width="280" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Grid RowSpacing="8">
