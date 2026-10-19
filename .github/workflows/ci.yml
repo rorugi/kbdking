@@ -182,7 +182,7 @@ jobs:
           KBDKING_NO_DIALOGS: "1"
         run: |
           dotnet publish src/Kbdking.App/Kbdking.App.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained -o app-out
-          dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-x64 --self-contained -o app-out
+          dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:PublishTrimmed=true -o app-out
           Get-ChildItem app-out -Filter *.pri | ForEach-Object { Write-Output "resources: $($_.Name)" }
           $p = Start-Process -FilePath app-out/Kbdking.App.exe -PassThru
           Start-Sleep -Seconds 20
@@ -296,8 +296,23 @@ jobs:
           foreach ($f in 'Kbdking.App.exe', 'kbdking.exe', 'Kbdking.App.pri') {
             if (-not (Test-Path (Join-Path $dir $f))) { Write-Output "::error title=Installer::$f is missing in $dir"; exit 1 }
           }
-          & (Join-Path $dir 'kbdking.exe') templates
+          # The installed (trimmed) CLI does the real work for the app: build, validate, install and uninstall.
+          $cli = Join-Path $dir 'kbdking.exe'
+          & $cli templates
           if ($LASTEXITCODE -ne 0) { exit 1 }
+          $sample = (Resolve-Path samples/german-austria-iast.kbdking).Path
+          Copy-Item $sample cli-test.kbdking
+          (Get-Content cli-test.kbdking -Raw) -replace '"dllName": "kbdiast"', '"dllName": "kbdkscli"' | Set-Content cli-test.kbdking -Encoding utf8
+          foreach ($cmd in @(@('validate', 'cli-test.kbdking'), @('test', 'cli-test.kbdking'), @('build', 'cli-test.kbdking', '-o', 'cli-build'))) {
+            & $cli @cmd
+            if ($LASTEXITCODE -ne 0) { Write-Output "::error title=Installed CLI::kbdking $($cmd -join ' ') failed"; exit 1 }
+          }
+          $out = & $cli install cli-test.kbdking 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0 -or $out -notmatch ' as ([0-9A-Fa-f]{8})') { Write-Output "::error title=Installed CLI::install failed: $($out -replace "`r",'' -replace "`n",'%0A')"; exit 1 }
+          $klid = $Matches[1]
+          & $cli uninstall $klid --yes
+          if ($LASTEXITCODE -ne 0) { Write-Output "::error title=Installed CLI::uninstall $klid failed"; exit 1 }
+          Write-Output "::notice title=Installed CLI::validate, test, build, install and uninstall work ($klid)"
           $app = Start-Process -FilePath (Join-Path $dir 'Kbdking.App.exe') -PassThru
           Start-Sleep -Seconds 20
           $app.Refresh()

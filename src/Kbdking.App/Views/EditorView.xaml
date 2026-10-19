@@ -350,6 +350,11 @@
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Text="Dead key + base → result. 'Chained' makes the result a dead key too (e.g. dot below, then macron → ṝ)." />
                         <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.DeadKeys.Selected.Entries, Mode=OneWay}" SelectionMode="None">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
                             <ListView.Header>
                                 <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,4">
                                     <TextBlock Width="120" Style="{StaticResource CaptionTextBlockStyle}" Text="Base" />
@@ -358,18 +363,35 @@
                             </ListView.Header>
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="vm:DeadKeyEntryViewModel">
-                                    <StackPanel Orientation="Horizontal" Spacing="12" Padding="0,4">
-                                        <TextBox Width="120" PlaceholderText="Base" Text="{x:Bind Base, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <TextBox Width="120" PlaceholderText="Result" Text="{x:Bind Result, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <Button VerticalAlignment="Center" Click="PickCharacter_Click" ToolTipService.ToolTip="Find a character by name">
+                                    <!-- The remove button comes before the character name, which is trimmed, so it is always visible. -->
+                                    <Grid Padding="0,4" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox PlaceholderText="Base" Text="{x:Bind Base, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Grid.Column="1" PlaceholderText="Result" Text="{x:Bind Result, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <Button Grid.Column="2" VerticalAlignment="Center" Click="PickCharacter_Click" ToolTipService.ToolTip="Find a character by name">
                                             <FontIcon Glyph="&#xE721;" FontSize="14" />
                                         </Button>
-                                        <CheckBox VerticalAlignment="Center" Content="Chained" IsChecked="{x:Bind Chained, Mode=TwoWay}" />
-                                        <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ResultName, Mode=OneWay}" />
-                                        <Button VerticalAlignment="Center" Command="{x:Bind RemoveCommand}" ToolTipService.ToolTip="Remove">
+                                        <CheckBox Grid.Column="3" MinWidth="0" VerticalAlignment="Center" Content="Chained" IsChecked="{x:Bind Chained, Mode=TwoWay}" />
+                                        <Button Grid.Column="4" VerticalAlignment="Center" Command="{x:Bind RemoveCommand}" ToolTipService.ToolTip="Remove">
                                             <SymbolIcon Symbol="Delete" />
                                         </Button>
-                                    </StackPanel>
+                                        <TextBlock
+                                            Grid.Column="5"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource CaptionTextBlockStyle}"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="{x:Bind ResultName, Mode=OneWay}"
+                                            TextTrimming="CharacterEllipsis"
+                                            TextWrapping="NoWrap"
+                                            ToolTipService.ToolTip="{x:Bind ResultName, Mode=OneWay}" />
+                                    </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
