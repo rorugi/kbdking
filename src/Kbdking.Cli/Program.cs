@@ -443,8 +443,8 @@ internal static partial class Program
         if (installed.TemporaryUntil is { } until)
             Out.WriteLine($"This is a test install: it is removed at {until.ToLocalTime():t}. Run 'kbdking keep {installed.Klid}' to keep it.");
 
-        // Remember the KLID so the next install updates this layout instead of adding another one.
-        if (layout.Metadata.LayoutId is null && path.EndsWith(".kbdking", StringComparison.OrdinalIgnoreCase))
+        // Remember the KLID (every install gets a new one) so the next install replaces this layout.
+        if (!string.Equals(layout.Metadata.LayoutId, installed.Klid, StringComparison.OrdinalIgnoreCase) && path.EndsWith(".kbdking", StringComparison.OrdinalIgnoreCase))
         {
             layout.Metadata.LayoutId = installed.Klid;
             File.WriteAllText(path, KbdkingFormat.Serialize(layout));

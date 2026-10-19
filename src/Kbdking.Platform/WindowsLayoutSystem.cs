@@ -30,6 +30,8 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
     // Layouts installed before the rename to kbdking carry these names; they are still recognised as ours.
     private const string LegacyMarkerValue = "Keyservant";
     private const string LegacyTemporaryValue = "KeyservantTemporaryUntil";
+    // The layout's own DLL name (kbdiast), also when it is installed under a numbered file name (kbdia002.dll).
+    private const string BaseNameValue = "kbdking Layout";
     private const string PackageFileName = "package.kslayout";
     internal const string TemporaryValue = "KbdkingTemporaryUntil";
     internal const string TaskFolder = "kbdking";
@@ -107,63 +109,128 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
             throw new LayoutSystemException($"Windows refused to remove {layout.Name} from the switcher.");
     }
 
-    public InstalledLayout Install(LayoutPackage package)
+    /// <summary>
+    /// Installs a layout. Windows loads a layout once per sign-in and keeps it by its ID and DLL file name, so
+    /// every install gets a fresh ID and file name: the new version works and shows its name at once, without
+    /// signing out. Earlier installs of the same layout (same DLL name, or the ID in the file) are removed and
+    /// replaced in the switcher.
+    /// </summary>
+    public InstalledLayout Install(LayoutPackage package) => Install(package, restoreKlid: null);
+
+    private InstalledLayout Install(LayoutPackage package, string? restoreKlid)
     {
         Elevation.RequireAdministrator("Installing a layout");
         using var root = Registry.LocalMachine.OpenSubKey(LayoutsKey, writable: true)
             ?? throw new LayoutSystemException("The keyboard layout registry key is missing.");
+        var baseName = Path.GetFileNameWithoutExtension(package.DllFileName);
 
-        // Reuse the KLID if this layout was installed before; otherwise allocate a new one.
-        var klid = package.LayoutId?.ToUpperInvariant();
-        if (klid is not null && root.OpenSubKey(klid) is { } existing)
+        var previous = new List<string>();
+        string klid, fileName;
+        if (restoreKlid is not null)
         {
-            using (existing)
-            {
-                if (!HasMarker(existing))
-                    throw new LayoutSystemException($"Layout ID {klid} belongs to a Windows layout; kbdking won't overwrite it.");
-                if (existing.GetValue("Layout File") is string file && !file.Equals(package.DllFileName, StringComparison.OrdinalIgnoreCase))
-                    throw new LayoutSystemException($"Layout ID {klid} belongs to another installed layout ({existing.GetValue("Layout Text")}, {file}). " +
-                        "If this file is a copy meant as a separate layout, remove its \"layoutId\" and install again.");
-            }
+            // Repair: put back exactly what was installed.
+            klid = restoreKlid.ToUpperInvariant();
+            fileName = package.DllFileName;
         }
-        var owner = FindLayoutUsingFile(root, package.DllFileName);
-        if (klid is null && owner is not null && IsKbdkingLayout(root, owner) && owner.EndsWith(package.LanguageId.ToString("X4", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase))
-            klid = owner.ToUpperInvariant(); // the same layout again (e.g. an installer run twice, or an update): update it in place
-        klid ??= AllocateKlid(root, package.LanguageId);
+        else
+        {
+            if (package.LayoutId?.ToUpperInvariant() is { } id && root.OpenSubKey(id) is { } existing)
+            {
+                using (existing)
+                {
+                    if (!HasMarker(existing))
+                        throw new LayoutSystemException($"Layout ID {id} belongs to a Windows layout; kbdking won't overwrite it.");
+                    if (!IsSameLayout(existing, baseName))
+                        throw new LayoutSystemException($"Layout ID {id} belongs to another installed layout ({existing.GetValue("Layout Text")}, {existing.GetValue("Layout File")}). " +
+                            "If this file is a copy meant as a separate layout, remove its \"layoutId\" and install again.");
+                }
+                previous.Add(id);
+            }
+            foreach (var other in root.GetSubKeyNames())
+            {
+                if (previous.Contains(other, StringComparer.OrdinalIgnoreCase)) continue;
+                using var key = root.OpenSubKey(other);
+                if (key is not null && HasMarker(key) && IsSameLayout(key, baseName)) previous.Add(other.ToUpperInvariant());
+            }
 
-        // Never overwrite a DLL that belongs to another layout.
-        if (owner is not null && !owner.Equals(klid, StringComparison.OrdinalIgnoreCase))
-            throw new LayoutSystemException($"{package.DllFileName} is already used by layout {owner}. Choose a different DLL name.");
-        if (owner is null && File.Exists(Path.Combine(_system32, package.DllFileName)))
-            throw new LayoutSystemException($"{package.DllFileName} already exists in System32 and isn't a kbdking layout. Choose a different DLL name.");
+            // Never touch a DLL that belongs to Windows or another program.
+            var owner = FindLayoutUsingFile(root, package.DllFileName);
+            if (owner is not null && !IsKbdkingLayout(root, owner))
+                throw new LayoutSystemException($"{package.DllFileName} is already used by layout {owner}. Choose a different DLL name.");
+            if (owner is null && previous.Count == 0 && File.Exists(Path.Combine(_system32, package.DllFileName)))
+                throw new LayoutSystemException($"{package.DllFileName} already exists in System32 and isn't a kbdking layout. Choose a different DLL name.");
+
+            klid = AllocateKlid(root, package.LanguageId);
+            fileName = previous.Count == 0 && owner is null && !File.Exists(Path.Combine(_sysWow64, package.DllFileName))
+                ? package.DllFileName
+                : NewFileName(root, baseName);
+        }
 
         // System32 gets the DLL of the machine's own architecture; SysWOW64 the 32-bit one.
         var arm64 = RuntimeInformation.OSArchitecture == Architecture.Arm64;
         if (arm64 && package.DllArm64 is null)
             throw new LayoutSystemException("This PC runs Windows on ARM, but the package has no ARM64 DLL. Build it again without --no-arm64.");
         var native = arm64 ? package.DllArm64! : package.DllX64;
-        CopyDll(native, Path.Combine(_system32, package.DllFileName));
+        CopyDll(native, Path.Combine(_system32, fileName));
         if (package.DllWow64 is not null && Directory.Exists(_sysWow64))
-            CopyDll(package.DllWow64, Path.Combine(_sysWow64, package.DllFileName));
+            CopyDll(package.DllWow64, Path.Combine(_sysWow64, fileName));
 
+        var installedPackage = package.WithDllFileName(fileName);
         using (var key = root.CreateSubKey(klid, writable: true))
         {
-            key.SetValue("Layout File", package.DllFileName);
+            key.SetValue("Layout File", fileName);
             key.SetValue("Layout Text", package.Name);
-            key.SetValue("Layout Display Name", package.DisplayNameReference, RegistryValueKind.ExpandString);
+            key.SetValue("Layout Display Name", installedPackage.DisplayNameReference, RegistryValueKind.ExpandString);
             if (key.GetValue("Layout Id") is not string)
                 key.SetValue("Layout Id", AllocateLayoutId(root));
             key.SetValue(MarkerValue, package.Version);
+            key.SetValue(BaseNameValue, baseName);
             key.DeleteValue(TemporaryValue, throwOnMissingValue: false);
             key.DeleteValue(LegacyMarkerValue, throwOnMissingValue: false);
             key.DeleteValue(LegacyTemporaryValue, throwOnMissingValue: false);
         }
         DeleteCleanupTask(klid); // a permanent install replaces a test install
 
-        SavePackage(klid, package);
+        SavePackage(klid, installedPackage);
         var installed = GetLayouts().First(l => l.Klid.Equals(klid, StringComparison.OrdinalIgnoreCase));
         if (!installed.IsEnabled) Enable(installed);
+
+        // The new version replaces the earlier ones (programs using them switch on their next layout change).
+        foreach (var old in previous) RemoveLayout(old);
         return installed with { IsEnabled = true };
+    }
+
+    /// <summary>True if this registration is the layout with this DLL name (any of its installed file names).</summary>
+    private static bool IsSameLayout(RegistryKey key, string baseName) =>
+        string.Equals(key.GetValue(BaseNameValue) as string ?? Path.GetFileNameWithoutExtension(key.GetValue("Layout File") as string ?? ""),
+            baseName, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A DLL file name this session has not loaded yet: up to five letters of the layout's name plus a number
+    /// higher than any used so far (kbdiast.dll → kbdia001.dll, kbdia002.dll, …).
+    /// </summary>
+    private string NewFileName(RegistryKey root, string baseName)
+    {
+        var prefix = baseName.Length > 5 ? baseName[..5] : baseName;
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var highest = 0;
+        foreach (var k in root.GetSubKeyNames())
+        {
+            using var key = root.OpenSubKey(k);
+            if (key?.GetValue("Layout File") is not string file) continue;
+            used.Add(file);
+            var stem = Path.GetFileNameWithoutExtension(file);
+            if (stem.Length == prefix.Length + 3 && stem.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(stem.AsSpan(prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var n))
+                highest = Math.Max(highest, n);
+        }
+        for (var i = 1; i <= 999; i++)
+        {
+            var n = (highest + i - 1) % 999 + 1;
+            var name = $"{prefix}{n:D3}.dll";
+            if (!used.Contains(name) && !File.Exists(Path.Combine(_system32, name)) && !File.Exists(Path.Combine(_sysWow64, name))) return name;
+        }
+        throw new LayoutSystemException($"No free DLL file name for {baseName} left; restart Windows and try again.");
     }
 
     public IReadOnlyList<string> DescribeUninstall(string klid)
@@ -180,6 +247,12 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
     public void Uninstall(string klid)
     {
         Elevation.RequireAdministrator("Uninstalling a layout");
+        RemoveLayout(klid);
+    }
+
+    /// <summary>Removes a kbdking layout: switcher entry, registration, DLLs, stored package and cleanup task.</summary>
+    private void RemoveLayout(string klid)
+    {
         var layout = FindCustom(klid);
         if (layout.IsEnabled)
         {
@@ -237,12 +310,7 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
                 var needsDll = !File.Exists(dll64) || package.DllWow64 is not null && Directory.Exists(_sysWow64) && !File.Exists(dll32);
                 if (key is null || needsDll)
                 {
-                    Install(new LayoutPackage
-                    {
-                        Name = package.Name, DllFileName = package.DllFileName, Locale = package.Locale,
-                        LanguageId = package.LanguageId, Version = package.Version, LayoutId = klid,
-                        DllX64 = package.DllX64, DllWow64 = package.DllWow64, DllArm64 = package.DllArm64, LayoutSource = package.LayoutSource,
-                    });
+                    Install(package, restoreKlid: klid);
                     report.Fixed.Add($"Restored {package.Name} ({klid}).");
                 }
             }

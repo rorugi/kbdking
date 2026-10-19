@@ -207,18 +207,61 @@ public partial class WindowsInstallTests
         layout.Metadata.Name = "kbdking name test A";
         var system = new WindowsLayoutSystem();
         var installed = system.Install(LayoutPackage.Create(layout, LayoutDllBuilder.Build(layout)));
+        var current = installed.Klid;
         try
         {
             Assert.Equal("kbdking name test A", system.GetLayouts().Single(l => l.Klid == installed.Klid).Name);
             layout.Metadata.Name = "kbdking name test B";
             layout.Metadata.LayoutId = installed.Klid;
             var again = system.Install(LayoutPackage.Create(layout, LayoutDllBuilder.Build(layout)));
-            Assert.Equal(installed.Klid, again.Klid);
-            Assert.Equal("kbdking name test B", system.GetLayouts().Single(l => l.Klid == installed.Klid).Name);
+            current = again.Klid;
+            // A fresh ID replaces the old one, so Windows shows the new name at once.
+            Assert.NotEqual(installed.Klid, again.Klid);
+            Assert.DoesNotContain(system.GetLayouts(), l => l.Klid == installed.Klid);
+            Assert.Equal("kbdking name test B", system.GetLayouts().Single(l => l.Klid == again.Klid).Name);
         }
         finally
         {
-            system.Uninstall(installed.Klid);
+            system.Uninstall(current);
+        }
+    }
+
+    /// <summary>
+    /// Windows keeps a loaded layout until sign-out. An update must still type the new characters right away:
+    /// load version 1 in this session, install version 2, and version 2 types its own character.
+    /// </summary>
+    [WindowsInstallFact]
+    public void Updated_layouts_type_the_new_characters_without_signing_out()
+    {
+        var layout = TestLayouts.Sample("german-austria-iast");
+        layout.Metadata.DllName = "kbdksupd";
+        layout.Metadata.Name = "kbdking update test";
+        layout.SetOutput((byte)'Q', ShiftState.AltGr, KeyOutput.Of("ā"));
+        var system = new WindowsLayoutSystem();
+        var first = system.Install(LayoutPackage.Create(layout, LayoutDllBuilder.Build(layout)));
+        var current = first.Klid;
+        try
+        {
+            var hkl1 = LoadKeyboardLayout(first.Klid, KlfNotEllShell);
+            Assert.NotEqual(0, hkl1);
+            Assert.Equal("ā", Press(hkl1, (byte)'Q', ShiftState.AltGr, false).Text);
+
+            layout.SetOutput((byte)'Q', ShiftState.AltGr, KeyOutput.Of("ă"));
+            layout.Metadata.LayoutId = first.Klid;
+            var second = system.Install(LayoutPackage.Create(layout, LayoutDllBuilder.Build(layout)));
+            current = second.Klid;
+            Assert.NotEqual(first.LayoutFile, second.LayoutFile);
+            var hkl2 = LoadKeyboardLayout(second.Klid, KlfNotEllShell);
+            Assert.NotEqual(0, hkl2);
+            Assert.NotEqual(hkl1, hkl2);
+            Assert.Equal("ă", Press(hkl2, (byte)'Q', ShiftState.AltGr, false).Text);
+            UnloadKeyboardLayout(hkl1);
+            UnloadKeyboardLayout(hkl2);
+            Assert.DoesNotContain(system.GetLayouts(), l => l.Klid == first.Klid);
+        }
+        finally
+        {
+            system.Uninstall(current);
         }
     }
 

@@ -710,10 +710,7 @@ public sealed class EditorViewModel : ObservableObject
     {
         if (result.Cancelled) { Status = "Cancelled."; return; }
         if (!result.Succeeded) { await _dialogs.ShowMessageAsync("Installation failed", result.Output); Status = "Installation failed."; return; }
-        // Windows loads a layout once per sign-in: an update reaches programs only after signing out and in again.
-        Status = result.Output.Trim() + (_layout.Metadata.LayoutId is not null
-            ? " Sign out and back in (or restart) so all programs use the updated version."
-            : "");
+        Status = result.Output.Trim();
         // The installer stores the assigned layout ID in the file; take it over so the next install updates in place
         // (unless another file was opened in the meantime).
         var saved = KbdkingFormat.Parse(await File.ReadAllTextAsync(file));

@@ -54,6 +54,13 @@ public sealed class LayoutPackage
 
     public KeyboardLayout ReadLayout() => KbdkingFormat.Parse(LayoutSource);
 
+    /// <summary>The same package with the DLLs installed under another file name.</summary>
+    public LayoutPackage WithDllFileName(string fileName) => new()
+    {
+        Name = Name, DllFileName = fileName, Locale = Locale, LanguageId = LanguageId, Version = Version, LayoutId = LayoutId,
+        DisplayNameId = DisplayNameId, DllX64 = DllX64, DllWow64 = DllWow64, DllArm64 = DllArm64, LayoutSource = LayoutSource,
+    };
+
     // ---------------------------------------------------------------- container
 
     private static readonly byte[] HeaderMagic = "KSVTPKG1"u8.ToArray();
