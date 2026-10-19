@@ -36,11 +36,11 @@ jobs:
         run: |
           $v = "${{ steps.version.outputs.version }}"
           dotnet publish src/Kbdking.App/Kbdking.App.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained -p:Version=$v -o dist/kbdking
-          dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:Version=$v -o dist/kbdking
+          dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-x64 --self-contained -p:Version=$v -o dist/kbdking
           dotnet publish src/Kbdking.Stub/Kbdking.Stub.csproj -c Release -r win-x64 -p:Version=$v -o dist/kbdking
           # ARM64: native app and CLI. The installer stub stays x64 (it runs emulated and installs the ARM64 DLL).
           dotnet publish src/Kbdking.App/Kbdking.App.csproj -c Release -p:Platform=ARM64 -r win-arm64 --self-contained -p:Version=$v -o dist/kbdking-arm64
-          dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-arm64 --self-contained -p:PublishSingleFile=true -p:Version=$v -o dist/kbdking-arm64
+          dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-arm64 --self-contained -p:Version=$v -o dist/kbdking-arm64
           Copy-Item dist/kbdking/Kbdking.Stub.exe dist/kbdking-arm64/
 
       # Code signing through SignPath Foundation (free for open source). Runs once the project is approved

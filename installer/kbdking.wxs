@@ -18,7 +18,7 @@
     <SummaryInformation Description="kbdking: create, edit and install Windows keyboard layouts" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of kbdking is already installed." AllowSameVersionUpgrades="yes" />
     <!-- Same UpgradeCode as the old "Keyservant" installer, so installing kbdking replaces it. -->
-    <MediaTemplate EmbedCab="yes" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <Icon Id="kbdking.ico" SourceFile="$(sys.SOURCEFILEDIR)..\src\Kbdking.App\Assets\kbdking.ico" />
     <Property Id="ARPPRODUCTICON" Value="kbdking.ico" />
