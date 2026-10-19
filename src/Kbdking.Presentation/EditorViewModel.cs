@@ -124,7 +124,10 @@ public sealed class EditorViewModel : ObservableObject
 
     internal string? FilePath => _filePath;
 
-    public string Title => $"{_layout.Metadata.Name}{(_isDirty ? " •" : "")} — {(_filePath is null ? "not saved" : Path.GetFileName(_filePath))}";
+    /// <summary>"Name — file.kbdking •" (• = unsaved changes), or "Name — not saved" for a new layout.</summary>
+    public string Title => _filePath is null
+        ? $"{_layout.Metadata.Name} — not saved"
+        : $"{_layout.Metadata.Name} — {Path.GetFileName(_filePath)}{(_isDirty ? " •" : "")}";
 
     public bool IsDirty { get => _isDirty; private set { if (SetProperty(ref _isDirty, value)) OnPropertyChanged(nameof(Title)); } }
 

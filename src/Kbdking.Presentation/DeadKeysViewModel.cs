@@ -188,8 +188,13 @@ public sealed class DeadKeysViewModel : ObservableObject
     private void AddCommon(string? combining)
     {
         if (combining is not { Length: 1 } || Kbdking.Core.Unicode.Diacritics.Find(combining[0]) is not { } diacritic) return;
-        var accent = diacritic.Spacing ?? diacritic.Combining;
-        var def = _editor.Layout.GetOrAddDeadKey(accent);
+        // Add to the dead key the layout already has for this accent (the selected one first), whatever
+        // character it uses (´, ', U+0301 …); only create a new dead key if there is none.
+        var existing = _selected is { } selected && Kbdking.Core.Unicode.Diacritics.Find(selected.AccentChar) == diacritic
+            ? _editor.Layout.FindDeadKey(selected.AccentChar)
+            : _editor.Layout.DeadKeys.FirstOrDefault(d => Kbdking.Core.Unicode.Diacritics.Find(d.Accent) == diacritic);
+        var accent = existing?.Accent ?? diacritic.Spacing ?? diacritic.Combining;
+        var def = existing ?? _editor.Layout.GetOrAddDeadKey(accent);
         def.Name ??= diacritic.Name;
         if (def.Find(' ') is null) def.Entries.Add(new DeadKeyEntry(' ', accent));
         var added = 0;
@@ -202,7 +207,9 @@ public sealed class DeadKeysViewModel : ObservableObject
         Load(_editor.Layout);
         Selected = DeadKeys.First(d => d.AccentChar == accent);
         _editor.MarkChanged();
-        _editor.Status = $"Dead key {diacritic.Name} with {added} compositions. Put it on a key on the Keys tab (tick \"Dead key\").";
+        _editor.Status = existing is not null
+            ? $"Added {added} compositions to the existing {def.Name ?? diacritic.Name} dead key."
+            : $"Dead key {diacritic.Name} with {added} compositions. Put it on a key on the Keys tab (tick \"Dead key\").";
     }
 
     internal void Changed(string? group = null) => _editor.MarkChanged(group);

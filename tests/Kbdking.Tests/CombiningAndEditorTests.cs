@@ -180,3 +180,23 @@ public partial class PresentationTests
         Assert.Equal(new[] { "German", "United Kingdom", "German (Austria) + IAST", "US" }, manager.Layouts.Select(l => l.Name).ToArray());
     }
 }
+
+public partial class PresentationTests
+{
+    [Fact]
+    public async Task Add_with_compositions_extends_the_existing_dead_key_for_that_accent()
+    {
+        var editor = NewEditor();
+        Assert.True(await editor.OpenFileInteractiveAsync(Path.Combine(AppContext.BaseDirectory, "Samples", "german-austria-iast.kbdking")));
+        var count = editor.Layout.DeadKeys.Count;
+        var macron = editor.Layout.FindDeadKey('̄')!;
+        Assert.Null(macron.Find('e'));
+
+        editor.DeadKeys.AddCommonCommand.Execute("̄");
+        Assert.Equal(count, editor.Layout.DeadKeys.Count); // no second macron dead key
+        Assert.Equal('ē', macron.Find('e')!.Value.Result);
+        Assert.Equal('Ē', macron.Find('E')!.Value.Result);
+        Assert.Equal('̄', editor.DeadKeys.Selected?.AccentChar);
+        Assert.Equal("German (Austria) + IAST — german-austria-iast.kbdking •", editor.Title);
+    }
+}
