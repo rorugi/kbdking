@@ -287,7 +287,7 @@
             <Grid Visibility="Collapsed">
                 <Grid ColumnSpacing="24" Padding="0,8">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="300" />
+                        <ColumnDefinition Width="260" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Grid RowSpacing="8">
@@ -357,8 +357,8 @@
                             </ListView.ItemContainerStyle>
                             <ListView.Header>
                                 <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,4">
-                                    <TextBlock Width="120" Style="{StaticResource CaptionTextBlockStyle}" Text="Base" />
-                                    <TextBlock Width="120" Style="{StaticResource CaptionTextBlockStyle}" Text="Result" />
+                                    <TextBlock Width="96" Style="{StaticResource CaptionTextBlockStyle}" Text="Base" />
+                                    <TextBlock Width="96" Style="{StaticResource CaptionTextBlockStyle}" Text="Result" />
                                 </StackPanel>
                             </ListView.Header>
                             <ListView.ItemTemplate>
@@ -366,8 +366,8 @@
                                     <!-- The remove button comes before the character name, which is trimmed, so it is always visible. -->
                                     <Grid Padding="0,4" ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120" />
-                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="96" />
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
