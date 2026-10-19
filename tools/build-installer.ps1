@@ -37,8 +37,9 @@ function Invoke-Checked([string] $what, [scriptblock] $command) {
 }
 
 Invoke-Checked 'Publish app' { dotnet publish src/Kbdking.App/Kbdking.App.csproj -c Release "-p:Platform=$platform" -r $rid --self-contained "-p:Version=$Version" -o $publish }
-# The app's copy of .NET is trimmed to what the app uses, so the CLI is one trimmed file of its own.
-Invoke-Checked 'Publish CLI' { dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r $rid --self-contained -p:PublishSingleFile=true -p:PublishTrimmed=true "-p:Version=$Version" -o $publish }
+# The CLI goes into the same folder and uses the app's copy of the .NET runtime (a single-file CLI would carry
+# a second copy of it, about 70 MB).
+Invoke-Checked 'Publish CLI' { dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r $rid --self-contained "-p:Version=$Version" -o $publish }
 
 # The layout installer stub. NativeAOT for ARM64 needs ARM64 C++ tools, so ARM64 builds use the x64 stub
 # (it runs emulated and installs the right DLL for the PC).

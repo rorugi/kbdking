@@ -20,10 +20,7 @@
          also for this unpackaged app; without it the app fails at startup with "XAML parsing failed". -->
     <EnableMsixTooling>true</EnableMsixTooling>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <!-- Publishing removes the unused parts of .NET and the Windows SDK projection (TrimMode partial: kbdking's
-         own assemblies stay complete, so data binding by name keeps working). -->
-    <PublishTrimmed>true</PublishTrimmed>
-    <TrimMode>partial</TrimMode>
+    <!-- Not trimmed: WinUI's data binding (C#/WinRT marshalling of view-model collections) breaks when trimmed. -->
     <!-- XAML compiler warnings are not under our control; keep them visible but non-fatal. -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>

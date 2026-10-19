@@ -182,7 +182,7 @@ jobs:
           KBDKING_NO_DIALOGS: "1"
         run: |
           dotnet publish src/Kbdking.App/Kbdking.App.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained -o app-out
-          dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:PublishTrimmed=true -o app-out
+          dotnet publish src/Kbdking.Cli/Kbdking.Cli.csproj -c Release -r win-x64 --self-contained -o app-out
           Get-ChildItem app-out -Filter *.pri | ForEach-Object { Write-Output "resources: $($_.Name)" }
           $p = Start-Process -FilePath app-out/Kbdking.App.exe -PassThru
           Start-Sleep -Seconds 20
