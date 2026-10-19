@@ -72,6 +72,8 @@ public sealed partial class MainWindow : Window
                     _editorView.SelectTab(tab);
                     break;
             }
+            // KBDKING_DEMO=1 fills the tools with an example (for the screenshots in the README).
+            if (Environment.GetEnvironmentVariable("KBDKING_DEMO") == "1") _editor.ShowDemo();
             // KBDKING_SHIFT_STATE=altgr shows the keyboard in that shift state (also for screenshots).
             if (Kbdking.Core.Model.ShiftState.TryParse(Environment.GetEnvironmentVariable("KBDKING_SHIFT_STATE"), out var state)
                 && _editor.ShiftStates.FirstOrDefault(o => o.State == state) is { } option)

@@ -200,3 +200,19 @@ public partial class PresentationTests
         Assert.Equal("German (Austria) + IAST — german-austria-iast.kbdking •", editor.Title);
     }
 }
+
+public partial class PresentationTests
+{
+    [Fact]
+    public async Task Demo_fills_the_tools_with_an_example()
+    {
+        var editor = NewEditor();
+        Assert.True(await editor.OpenFileInteractiveAsync(Path.Combine(AppContext.BaseDirectory, "Samples", "german-austria-iast.kbdking")));
+        editor.ShowDemo();
+        Assert.NotNull(editor.KeyEditor);
+        Assert.NotEmpty(editor.Assistant.Proposals);
+        Assert.NotEmpty(editor.PreviewText);
+        await WaitUntil(() => editor.Analysis.HeatmapSvg is not null);
+        Assert.NotNull(editor.Analysis.HeatmapSvg);
+    }
+}

@@ -208,6 +208,7 @@ jobs:
         shell: pwsh
         env:
           KBDKING_NO_DIALOGS: "1"
+          KBDKING_DEMO: "1"
         run: |
           Add-Type -AssemblyName System.Drawing
           Add-Type -TypeDefinition @'

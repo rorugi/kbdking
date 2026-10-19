@@ -447,6 +447,21 @@ public sealed class EditorViewModel : ObservableObject
 
     // ---------------------------------------------------------------- editing
 
+    /// <summary>
+    /// Fills the tools with an example (for screenshots): a selected key, text in the preview, a Sanskrit character
+    /// set in the assistant and an analysed text.
+    /// </summary>
+    public void ShowDemo()
+    {
+        const string text = "dharmakṣetre kurukṣetre samavetā yuyutsavaḥ māmakāḥ pāṇḍavāś caiva kim akurvata sañjaya";
+        if (_allKeys.FirstOrDefault(k => k.VirtualKey == (byte)'R') is { } r) SelectKey(r);
+        PreviewText = "dharmakṣetre kurukṣetre";
+        Assistant.Characters = Assistant.Presets.First(p => p.Name.Contains("15919", StringComparison.Ordinal) && p.Name.StartsWith("Sanskrit", StringComparison.Ordinal)).Characters;
+        Assistant.SuggestCommand.Execute(null);
+        Analysis.Text = text;
+        Analysis.AnalyzeCommand.Execute(null);
+    }
+
     internal void SelectKey(KeyCapViewModel cap)
     {
         if (_selectedKey is not null) _selectedKey.IsSelected = false;
