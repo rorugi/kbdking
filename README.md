@@ -6,9 +6,6 @@ kbdking creates, edits and installs Windows keyboard layouts. It imports an exis
 change any key, dead key or ligature, and builds a real Windows layout DLL, so the result works in every
 app with nothing running in the background. Free and open source (MIT).
 
-Formerly called *Keyservant*. Installing kbdking replaces an installed Keyservant, layouts installed with it are
-kept and managed as before, and old `.keyservant` files open once renamed to `.kbdking`.
-
 > **Status: v0.1, early development.** The engine, file formats, DLL writer and CLI are implemented and
 > tested; the Windows app and the installer are first versions that still need testing on real PCs.
 > See [Status](#status) before using it on a machine you care about.
