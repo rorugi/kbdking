@@ -16,7 +16,7 @@
         <TextBlock TextWrapping="Wrap" Style="{StaticResource BodyTextBlockStyle}"
                    Text="Made by Roland Russwurm, developed with the help of AI (Claude Code by Anthropic)." />
         <TextBlock TextWrapping="Wrap" Style="{StaticResource BodyTextBlockStyle}"
-                   Text="Open source under the MIT licence. Free code signing provided by SignPath.io, certificate by SignPath Foundation." />
+                   Text="Open source under the MIT licence." />
         <HyperlinkButton Content="github.com/rorugi/kbdking" NavigateUri="https://github.com/rorugi/kbdking" />
     </StackPanel>
 </UserControl>

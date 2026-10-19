@@ -15,13 +15,40 @@ kept and managed as before, and old `.keyservant` files open once renamed to `.k
 
 ## Install
 
-Download the newest installer from [**Releases → latest**](https://github.com/rorugi/kbdking/releases/tag/latest):
+Download the installer from [**Releases**](https://github.com/rorugi/kbdking/releases):
 `kbdking-x64.msi` (or `kbdking-arm64.msi` for Windows on ARM) and run it. It installs kbdking for all users,
-adds it to the Start menu and puts the `kbdking` command on the PATH; uninstall it in Settings → Apps. Every
-change on `main` builds a new one. The installer isn't signed yet, so Windows may say it doesn't know the publisher:
-choose *More info → Run anyway*.
+adds it to the Start menu and puts the `kbdking` command on the PATH; uninstall it in Settings → Apps. The newest
+build of `main` is always at [Releases → latest](https://github.com/rorugi/kbdking/releases/tag/latest).
+The installer isn't code-signed, so Windows may say it doesn't know the publisher: choose *More info → Run anyway*.
 
 To build the installer yourself: `.\tools\build-installer.ps1` (writes `artifacts\kbdking-x64.msi`).
+
+## A quick tour
+
+**Edit every key** in every shift state. The keyboard shows what each key types (here with AltGr); the light grey
+keys are the home row, dead keys are yellow. Pick a key and edit its characters below, or type into the preview box
+to try the layout before installing it.
+
+![Keys page with the AltGr characters of a German layout with Sanskrit transliteration](docs/images/keys.png)
+
+**Dead keys**: an accent key followed by a letter gives the accented letter (dot below + r → ṛ). Chained dead keys
+give letters with two accents (dot below + macron + r → ṝ).
+
+![Dead keys page with the compositions of the acute accent](docs/images/dead-keys.png)
+
+**Placement assistant**: enter the characters you need, or pick a set such as Sanskrit, Pinyin or Vietnamese, and
+kbdking proposes where to put them, keeping everything the layout already has.
+
+![Assistant proposing keys for Sanskrit transliteration](docs/images/assistant.png)
+
+**Text analysis**: paste a text you type often and see how many keystrokes each character needs, as a heatmap.
+
+![Heatmap of a Sanskrit text](docs/images/analysis.png)
+
+**Layout manager**: every layout on the PC, the ones in your Win+Space switcher first. Switch them on and off,
+install, repair or uninstall your own.
+
+![Layouts page](docs/images/layouts.png)
 
 ## Features
 
@@ -166,9 +193,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Code signing
 
-Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
-[SignPath Foundation](https://signpath.org) (application pending). See
-[CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
+The installers are not code-signed. Windows SmartScreen may therefore warn that it doesn't know the publisher;
+choose *More info → Run anyway*. The keyboard layout DLLs that kbdking writes don't need a signature.
 
 ## License
 
