@@ -150,7 +150,8 @@ public static class HelpTopics
         ["layout-id"] = new("Layout ID",
             "The identifier Windows uses for the installed layout (KLID, for example A0000C07: the last four digits are the language). " +
             "kbdking assigns it on the first install and stores it in the file, so installing again updates the same layout instead " +
-            "of adding a second one."),
+            "of adding a second one. Windows loads a layout once per sign-in, so after an update sign out and back in before " +
+            "testing it in other programs."),
 
         // ------------------------------------------------------------ install
         ["test-install"] = new("Test install",
