@@ -271,16 +271,30 @@ jobs:
       fail-fast: false
       matrix:
         arch: [x64, arm64]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # tags, for the version number
 
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
+      # Builds between releases are numbered after the last release: 0.1.0.42 = build 42 after v0.1.0.
+      # (The MSI allows downgrades, so a release always installs over a newer build and the other way round.)
+      - name: Version
+        id: version
+        shell: pwsh
+        run: |
+          $tag = git describe --tags --abbrev=0 --match 'v[0-9]*' 2>$null
+          $base = if ($tag) { $tag.TrimStart('v') } else { '0.0.0' }
+          "version=$base.${{ github.run_number }}" >> $env:GITHUB_OUTPUT
+
       - name: Build the MSI
         shell: pwsh
-        run: ./tools/build-installer.ps1 -Arch ${{ matrix.arch }} -Version "0.1.${{ github.run_number }}"
+        run: ./tools/build-installer.ps1 -Arch ${{ matrix.arch }} -Version "${{ steps.version.outputs.version }}"
 
       # Installs the MSI like a user would, checks that the app starts from Program Files and the CLI is
       # there, then uninstalls it again. ARM64 can only be built here, not run.
@@ -328,7 +342,7 @@ jobs:
           Stop-Process -Id $app.Id -Force
           $p = Start-Process msiexec.exe -ArgumentList '/x', "`"$msi`"", '/qn' -Wait -PassThru
           if ($p.ExitCode -ne 0 -or (Test-Path (Join-Path $dir 'Kbdking.App.exe'))) { Write-Output '::error title=Installer::uninstall failed'; exit 1 }
-          Write-Output "::notice title=Installer::Installed, started and uninstalled kbdking 0.1.${{ github.run_number }}."
+          Write-Output "::notice title=Installer::Installed, started and uninstalled kbdking ${{ steps.version.outputs.version }}."
 
       - uses: actions/upload-artifact@v5
         with:
@@ -361,7 +375,7 @@ jobs:
         run: |
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest dist/*.msi --prerelease --target "${{ github.sha }}" \
-            --title "Latest build (0.1.${{ github.run_number }})" \
+            --title "Latest build (${{ needs.installer.outputs.version }})" \
             --notes "Automatic build of the newest commit on main (${GITHUB_SHA::7}). Not signed yet: Windows may warn that it doesn't know the publisher; choose More info → Run anyway. Download kbdking-x64.msi (or kbdking-arm64.msi for Windows on ARM) and run it."
 
       - uses: actions/download-artifact@v5
@@ -379,5 +393,5 @@ jobs:
           ls screenshots/*.png >/dev/null 2>&1 || exit 0
           gh release delete screenshots --yes --cleanup-tag || true
           gh release create screenshots screenshots/*.png --prerelease --target "${{ github.sha }}" \
-            --title "Screenshots of build 0.1.${{ github.run_number }}" \
+            --title "Screenshots of build ${{ needs.installer.outputs.version }}" \
             --notes "Pictures of the app taken automatically by the build (${GITHUB_SHA::7}), for checking the user interface. Not a download."

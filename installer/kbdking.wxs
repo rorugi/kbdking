@@ -16,7 +16,8 @@
       Compressed="yes"
       Language="1033">
     <SummaryInformation Description="kbdking: create, edit and install Windows keyboard layouts" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of kbdking is already installed." AllowSameVersionUpgrades="yes" />
+    <!-- Any version replaces any other: a release installs over a newer test build and the other way round. -->
+    <MajorUpgrade AllowDowngrades="yes" />
     <!-- Same UpgradeCode as the old "Keyservant" installer, so installing kbdking replaces it. -->
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
