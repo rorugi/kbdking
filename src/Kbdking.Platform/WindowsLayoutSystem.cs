@@ -197,7 +197,7 @@ public sealed class WindowsLayoutSystem : ILayoutSystem
 
         // The new version replaces the earlier ones (programs using them switch on their next layout change).
         foreach (var old in previous) RemoveLayout(old);
-        return installed with { IsEnabled = true };
+        return installed with { IsEnabled = true, Replaced = previous };
     }
 
     /// <summary>True if this registration is the layout with this DLL name (any of its installed file names).</summary>

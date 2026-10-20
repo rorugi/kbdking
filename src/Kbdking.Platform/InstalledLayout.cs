@@ -27,6 +27,9 @@ public sealed record InstalledLayout
     /// <summary>For a test install: when it is reverted automatically. Null for normal installs.</summary>
     public DateTimeOffset? TemporaryUntil { get; init; }
 
+    /// <summary>After an install: the earlier installs of the same layout that this one replaced (their KLIDs).</summary>
+    public IReadOnlyList<string> Replaced { get; init; } = [];
+
     /// <summary>The language this layout is offered under. Custom layouts carry it in the KLID's low word.</summary>
     public ushort LanguageId => ushort.TryParse(Klid.AsSpan(4), System.Globalization.NumberStyles.HexNumber, null, out var id) ? id : (ushort)0;
 

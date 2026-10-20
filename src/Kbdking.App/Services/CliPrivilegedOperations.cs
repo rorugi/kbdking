@@ -31,6 +31,12 @@ internal sealed class CliPrivilegedOperations : IPrivilegedOperations
         {
             var code = Elevation.RunElevated(CliPath, [.. args, "--log", log]);
             var output = File.Exists(log) ? File.ReadAllText(log) : "";
+            // The switcher belongs to this (unelevated) user; see UserSwitcher.
+            if (code == 0)
+            {
+                try { UserSwitcher.Apply(output); }
+                catch (Exception ex) when (ex is not OutOfMemoryException) { App.Log(ex); }
+            }
             return code is null
                 ? new OperationResult(false, "", Cancelled: true)
                 : new OperationResult(code == 0, output);

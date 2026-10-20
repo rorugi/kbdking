@@ -42,6 +42,9 @@ public sealed partial class MainWindow : Window
         _layoutsView = new LayoutsView(manager);
         _editorView = new EditorView(editor);
         Nav.SelectedItem = LayoutsItem;
+        // Entries of layouts that no longer exist can't be selected in the switcher; remove them.
+        try { UserSwitcher.RemoveStale(); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { App.Log(ex); }
         manager.Refresh();
         Nav.Loaded += OnFirstLoaded;
     }

@@ -440,6 +440,7 @@ internal static partial class Program
             ? system.InstallTemporary(package, TimeSpan.FromMinutes(min), Environment.ProcessPath ?? "kbdking.exe")
             : system.Install(package);
         Out.WriteLine($"Installed {installed.Name} as {installed.Klid} and added it to your switcher (Win+Space).");
+        foreach (var old in installed.Replaced) Out.WriteLine($"Replaced {old} (the earlier install of this layout).");
         if (installed.TemporaryUntil is { } until)
             Out.WriteLine($"This is a test install: it is removed at {until.ToLocalTime():t}. Run 'kbdking keep {installed.Klid}' to keep it.");
 
@@ -496,11 +497,15 @@ internal static partial class Program
         var exe = Environment.ProcessPath ?? throw new LayoutSystemException("Can't find the kbdking executable.");
         Out.WriteLine("Asking for administrator rights...");
         var code = Elevation.RunElevated(exe, [.. args, "--log", log]);
+        var output = "";
         if (File.Exists(log))
         {
-            Out.Write(File.ReadAllText(log));
+            output = File.ReadAllText(log);
+            Out.Write(output);
             File.Delete(log);
         }
+        // The switcher belongs to this (unelevated) user; see UserSwitcher.
+        if (code == 0) UserSwitcher.Apply(output);
         if (code is null)
         {
             Err.WriteLine("Cancelled: administrator rights were not granted.");
